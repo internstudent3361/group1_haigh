@@ -1,0 +1,67 @@
+---
+title: "reverse coding"
+author: "Jen Richmond"
+date: "29/06/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# load packages
+
+```{r}
+library(tidyverse)
+```
+
+# make some example data
+
+Lets imagine we have a scale that has 10 items. Our 10 participants have answered each question on a 5 point Likert scale. Items 2, 4, 6 and 8 need to be reverse coded
+```{r}
+df <- tibble(Q1_1 = c(1, 4, 2, 5, 3, 4, 1, 2, 4, 5), 
+                    Q1_2 = c(3, 5, 4, 2, 3, 1, 4, 2, 5, 2), 
+                    Q1_3 = c(5, 4, 3, 2, 4, 1, 3, 2, 3, 4),
+                    Q1_4 = c(5, 2, 3, 4, 1, 5, 2, 4, 1, 5), 
+                    Q1_5 = c(1, 4, 2, 5, 3, 4, 1, 2, 4, 5), 
+                    Q1_6 = c(3, 5, 4, 2, 3, 1, 4, 2, 5, 2), 
+                    Q1_7 = c(5, 4, 3, 2, 4, 1, 3, 2, 3, 4),
+                    Q1_8 = c(5, 2, 3, 4, 1, 5, 2, 4, 1, 5), 
+                    Q1_9 = c(5, 2, 3, 4, 1, 5, 2, 4, 1, 5), 
+                    Q1_10 = c(5, 2, 3, 4, 1, 5, 2, 4, 1, 5))
+
+
+```
+
+For the items that need to be reverse coded, you might like to use mutate and recode (both from dplyr) to create a new recoded variable, leaving the other variables in the dataframe. 
+```{r}
+rev_new <- df %>%
+  mutate(Q1_2rev = recode(Q1_2, '1'='5', '2'='4', '3' = '3' , '4'='2', '5'='1')) %>% 
+         mutate(Q1_4_rev = recode(Q1_4, '1'='5', '2'='4', '3' = '3' , '4'='2', '5'='1')) %>%
+        mutate(Q1_6_rev = recode(Q1_6, '1'='5', '2'='4', '3' = '3' , '4'='2', '5'='1')) %>%
+          mutate(Q1_8_rev = recode(Q1_8, '1'='5', '2'='4', '3' = '3' , '4'='2', '5'='1'))
+```
+         
+Other times you might like to overwrite the original variables.
+```{r}
+         
+rev_overwrite <- df %>%
+  mutate(Q1_2 = recode(Q1_2, '1'='5', '2'='4', '3' = '3' , '4'='2', '5'='1')) %>% 
+         mutate(Q1_4 = recode(Q1_4, '1'='5', '2'='4', '3' = '3' , '4'='2', '5'='1')) %>%
+        mutate(Q1_6 = recode(Q1_6, '1'='5', '2'='4', '3' = '3' , '4'='2', '5'='1')) %>%
+          mutate(Q1_8 = recode(Q1_8, '1'='5', '2'='4', '3' = '3' , '4'='2', '5'='1'))
+
+```         
+
+
+When you have a lot of variables, spelling out the recoding for each one individually can be tedious. By using `across()` to define the variables we want to recode, we can recode lots of variables at once and avoid repeating ourselves (making our code DRY)
+
+```{r}
+rev_across <- df %>%
+  mutate(across(c(Q1_2, Q1_4, Q1_6, Q1_8), ~ recode(., '1'='5', '2'='4', '3' = '3' , '4'='2', '5'='1')))
+
+```
+
+
+         
+         
