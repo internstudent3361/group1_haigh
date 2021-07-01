@@ -1,0 +1,74 @@
+---
+title: "animal rescues"
+author: "Jen Richmond"
+date: "30/06/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# load packages
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(ggeasy)
+```
+
+# read data
+
+```{r message=FALSE, warning=FALSE}
+animal_rescues <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-29/animal_rescues.csv')
+
+```
+
+# clean data
+
+```{r}
+by_animal <- animal_rescues %>%
+  tabyl(animal_group_parent) 
+
+```
+
+
+```{r}
+by_animal <- by_animal %>%
+  select(-3) %>%
+  rename(animal = animal_group_parent, number_of_rescues = n)
+
+```
+
+```{r}
+top5 <- by_animal %>%
+  arrange(-number_of_rescues) %>%
+  slice(1:5)
+```
+
+# visualise data
+
+```{r}
+top5 %>%
+  ggplot(aes(x = animal, y = number_of_rescues)) +
+  geom_col()
+  
+```
+
+```{r}
+top5 %>%
+  ggplot(aes(x = reorder(animal, number_of_rescues), y = number_of_rescues, fill = animal)) +
+  geom_col() +
+  coord_flip()
+```
+
+```{r}
+top5 %>%
+  ggplot(aes(x = reorder(animal, number_of_rescues), y = number_of_rescues, fill = animal)) +
+  geom_col() +
+  coord_flip() +
+  theme_classic() +
+  labs(x = "Animal", y = "Number of rescues") +
+  easy_remove_legend()
+```
+
