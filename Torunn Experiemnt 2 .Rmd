@@ -1,0 +1,33 @@
+---
+title: "Verification Report - Experiment 2"
+author: "Torunn Briers"
+date: "06/07/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Set up and tidy data
+
+## Loading packages 
+
+- Not sure what packages I'll need at this point so starting with the same ones used in Experiemnt 1
+```{r, results='hide', message=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(janitor)
+library(ggeasy)
+library(ggbeeswarm)
+library(kableExtra)
+library(devtools)
+library(psych)
+library(qualtRics)
+```
+
+## Reading the data
+```{r, results='hide', message=FALSE}
+Exp_1_data <- read_csv(file= "./data/Study_1_data.csv") # Named my data Exp_1_data (Experiment 1 data)
+```
