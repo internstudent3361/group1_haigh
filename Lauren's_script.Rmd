@@ -1,0 +1,225 @@
+
+# Experiment 1  
+ 
+```{r}
+
+#Loading relevant packages
+library(tidyverse)
+library(dplyr)
+library(qualtRics)
+library(tidyr)
+library(ggpubr)
+library(ggplot2)
+library(patchwork)
+library(ggbeeswarm)
+
+#Reading the data from my working directory using the qualtRics 'read_survey' function - Notably, this function removes the text in rows 2 and 3 (not part of the data)
+#This function also sets all relevant columns to 'numeric' rather than 'character', which allows us to do descriptive calculations, mutate new variables, and plot data
+mydata=read_survey("Study_1_data.csv")
+
+# Checking the types of variable we have (e.g., numeric, string, character etc.) **Note that relevant columns for calulations are 'numeric'
+#sapply(mydata, class)
+
+# CONVERT mydata to a data.frame - the qualtRics package Formats the data to a tibble rather than a data frame - converting mydata into a data.frame fixes the rounding issue in my numeric calculations 
+mydata<- as.data.frame(mydata)
+```
+
+## 1. Filtering Data 
+```{r}
+
+#Count how many times the survey was opened i.e. the number of observations (anyone with progress >= 1%)   [371] 
+mydata %>% count(Progress>=1) #371
+
+#Count how many particpants CONSENTED to take part (this is BEFORE any exclusions for non-completion / non-serious responding) [363]
+#371 rows in data frame, but only 363 clicked the consent button 
+mydata %>% count(Consent==1) #363
+
+#Renaming variables "SC0" to "recall_score" and "FL_10_DO" to "condition"
+mydata <- mydata %>% rename(Recall_score = SC0, Condition = FL_10_DO)
+
+#UNPLANNED EXCLUSION: Some participants completed the study twice, thus there are duplicated IDs (identified through the Profilic_PID variable) that must be filtered out
+mydata %>% count(duplicated(Prolific_PID)) #count duplicates (TRUE = 59, FALSE = 312)
+mydata <- mydata[!duplicated(mydata$Prolific_PID), ] #remove duplicate rows from mydata - this function removes the second (duplicate) response  
+mydata %>% count(Progress>=1) #Ensure that the no. of observations are now 312 (59 were removed)
+
+#PLANNED EXCLUSIONS:
+# Applying exclusion criteria: participants who finished the study (Finished==1), declared that they answered seriously (seriousness_check==1) AND scored 4 or above on recall
+# NOTE: Filtering for 'Finished' excludes those who didn't consent automatically
+# THEN creating a subset of relevant variables 
+
+mydata <- mydata %>% 
+    filter(
+      Finished == 1,
+      Serious_check == 1,
+      Recall_score >= 4) %>% 
+    select(
+      Finished,
+      `Duration (in seconds)`,
+      Gender,
+      Age,
+      Serious_check, 
+      Recall_score,
+      Condition,
+      contradiction_1:advancement)
+  
+#Count how many participants remain after exclusions (final sample size = 294)
+mydata %>% summarise(n())
+Total_n <- mydata %>% summarise(n())
+
+#Export the data to a .csv
+write_csv(mydata, "MyDataSubset.csv")
+```
+
+## 2. Descriptive stats > Calculating demographics (Exp 1)
+
+```{r}
+#AGE: Calculating the mean, SD, and range
+mydata %>% summarise(mean(Age), sd(Age), range(Age)) # M = 34.29, SD = 12.67, Range = 18-69
+
+#GENDER: No. of males(Value: '1') and females('2'), Other('3') and Prefer not to say('4'):
+mydata %>% count(Gender) #male = 126, female = 168, other = 0, prefer not = 0
+```
+
+## 3. Descriptive stats > Descriptive ggplots (Exp 1)
+
+```{r}
+##For contradiction plot, must create a NEW variable: sum of the six contradiction ratings
+mydata <- mydata %>%
+  rowwise() %>%
+  mutate(contradiction = sum(contradiction_1, contradiction_2, contradiction_3, contradiction_4, contradiction_5, contradiction_6))
+
+##For all plots
+#Separate the data in Condition into 4 columns to separate levels of each IV  ("Block_1_Generic_Conflict", "Block_2_Generic_Consistent", "Block_3_Qualified_Conflict" and "Block_4_Qualified_Consistent")
+mydata <- separate(mydata, Condition, c("block", "number", "Format", "Conflict"))
+
+#Set relevant IV columns ("Format" and "Conflict" as factors) 
+mydata <- mydata %>%
+  mutate(Format=as.factor(Format)) %>%
+  mutate(Conflict=as.factor(Conflict))
+
+sapply(mydata, class) #to check
+
+#Export the FINAL data to a .csv
+write_csv(mydata, "MyDataTidiedSubset.csv")
+
+##Violin ggplots
+
+#Contradiction plot
+contradiction_violinplot <- ggplot(mydata, aes(x = Conflict, y = contradiction, fill = Conflict)) + #fill = colour grouping based on Conflict type
+  geom_violin() +   #creating violin plot
+  facet_wrap(vars(Format), strip.position = "bottom")+  #dividing plots by format, and changing facet titles to be at the bottom rather than top
+  stat_summary(      #adding crossbars to indicate mean of contradiction scores as well as 95% confidence intervals
+    mapping = NULL,
+    data = NULL,
+    geom = "crossbar",
+    fun.data = "mean_ci",   #adding 95% confidence intervals
+    fill = "white",         #changing colour
+    alpha = .7)+            #changing transparency of fill
+  geom_beeswarm(cex = 0.2)+             #adding dotpoints to violin plot. cex = scaling for adjusting point spacing
+  ggtitle(label = "Contradiction")+     #adding title
+  scale_y_continuous(        
+    name = "Perceived Contradiction",   #adding y-axis title
+    limits = c(0,30))+                 #setting scale from 0 to 30
+  scale_x_discrete(name = NULL)+        #removing x-axis title
+  theme(plot.title = element_text(hjust = 0.5)) +   #centering the title
+  theme(legend.position = 'none') +    #removing legend
+  scale_fill_manual(values=c("slategray2", "lightpink1")) #manually changing the fill colours from default colour grouping based on conflict to our desired colours
+print(contradiction_violinplot)
+
+#Advancement plot
+advancement_violinplot <- ggplot(mydata, aes(x = Conflict, y = advancement, fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position = "bottom")+
+  stat_summary(
+    mapping = NULL,
+    data = NULL,
+    geom = "crossbar",
+    fun.data = "mean_ci",
+    fill = "white",
+    alpha = .7)+
+  geom_beeswarm(cex = 0.2)+
+  ggtitle(label = "Advancement")+
+  scale_y_continuous(name = "Perceived Scientific Advancement")+
+  scale_x_discrete(name = NULL)+
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(legend.position = 'none') +
+  scale_fill_manual(values=c("slategray2", "lightpink1"))
+print(advancement_violinplot)
+
+#Confusion plot
+confusion_violinplot <- ggplot(mydata, aes(x = Conflict, y = confusion, fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position = "bottom")+
+  stat_summary(
+    mapping = NULL,
+    data = NULL,
+    geom = "crossbar",
+    fun.data = "mean_ci",
+    fill = "white",
+    alpha = .7)+
+  geom_beeswarm(cex = 0.2)+
+  ggtitle(label = "Confusion") +
+  scale_y_continuous(name = "Perceived Confusion") +
+  scale_x_discrete(name = NULL) +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(legend.position = 'none') +
+  scale_fill_manual(values=c("slategray2", "lightpink1"))
+print(confusion_violinplot)
+
+# Combine plots using the package patchwork()
+combinedplots1 <- contradiction_violinplot + advancement_violinplot + confusion_violinplot + plot_layout(ncol = 2)
+print(combinedplots1)
+
+```
+
+## 4. Descriptive stats > Pre-registered analysis of group means (Exp 1)
+
+```{r}
+##Conflicting vs non. conflicting group means (pre-registered analysis)
+
+#Perceived Contradiction: Participants exposed to conflicting headlines perceived greater contradiction between the six headline pairs (M = 25.3) than those exposed to non-conflicting headlines (M = 13.4)
+contradiction_means <- mydata %>%       # Specify data frame
+  group_by(Conflict) %>%                # Specify group indicator
+  summarise_at(vars(contradiction),     # Specify column
+               list(name = mean))       # Specify function
+print(contradiction_means)
+
+#Advancement: The mean response of those exposed to non-conflicting headlines (0.007) was greater than the mean response of those exposed to conflicting headlines (-0.25)
+advancement_means <- mydata %>%         # Specify data frame
+  group_by(Conflict) %>%                # Specify group indicator
+  summarise_at(vars(advancement),       # Specify column
+               list(name = mean))       # Specify function
+print(advancement_means)
+
+#Confusion: Participants exposed to conflicting headlines indicated greater agreement that ‘the headlines create confusion about how to be healthy’ than those exposed to non-conflicting headlines (4.52 vs 3.65 on a 5-point scale)
+confusion_means <- mydata %>%           # Specify data frame
+  group_by(Conflict) %>%                # Specify group indicator
+  summarise_at(vars(confusion),         # Specify column
+               list(name = mean))       # Specify function
+print(confusion_means)
+```
+
+## 5. Descriptive stats > Descriptive Historgram (Exp 1)
+```{r}
+# The following histogram plots how many people selected  -1 / 0 / +1 on the advancement scale for each of the four conditions
+
+#FIRST adding value labels - using the ordered() function for ordinal data.
+advancementvalue <- ordered(mydata$advancement,
+        levels = c(-1, 0, 1),
+        labels = c("Less", "Same", "More")) #labeling the levels of advancement
+
+advancement_histogram <- ggplot(mydata) + geom_bar(
+  aes(
+    x=advancementvalue, 
+    group = Conflict:Format,    
+    fill = Conflict:Format),
+  position = "dodge")+     #plotting side by side
+  scale_x_discrete(name = "Advancement")+
+  scale_y_continuous(name = "Number of Participants")+
+  scale_fill_grey(name = "Condition", 
+                  labels = c("Conflicting/Generic", 
+                             "Conflicting/Qualified",
+                             "Non-conflicting/Generic",
+                             "Non-conflicting/Qualified"))
+print(advancement_histogram)
+```
