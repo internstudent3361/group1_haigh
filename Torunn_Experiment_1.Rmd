@@ -1,5 +1,5 @@
 ---
-title: "Verification Report"
+title: "Verification Report - Experiemnt 1"
 author: "Torunn Briers"
 date: "03/07/2021"
 output:
@@ -40,14 +40,14 @@ library(qualtRics)
 
 ## Reading the data
 ```{r, results='hide', message=FALSE}
-Exp_1_data <- read_csv(file= "../data/Study_1_data.csv") # Named my data Exp_1_data (Experiment 1 data)
+Exp_1_data <- read_csv(file= "./data/Study_1_data.csv") # Named my data Exp_1_data (Experiment 1 data)
 ```
 
 ## Remove lines 2 and 3 
 ```{r, results='hide', message=FALSE}
 # Exp_1_data <- Exp_1_data %>% slice(-1:-2) 
 
-Exp_1_data = read_survey("Study_1_data.csv")
+Exp_1_data = read_survey("./data/Study_1_data.csv")
 ```
 
 ## Make data into a data fram 
@@ -140,8 +140,17 @@ count(Exp_1_data)
 - **No. of male participants: 126**
 - **No. of female participants: 168** 
 
+Before counting gender I change the names of the Gender variables to 'male' and 'female' so that the following table is more clear.
 ``` {r}
-Exp_1_data %>% group_by(Gender) %>% count(Gender) 
+Exp_1_data$Gender <- recode_factor(Exp_1_data$Gender,
+                                   '1' = "Male",
+                                   '2' = "Female", 
+                                   '3' = "Other",
+                                   '4' = "Prefer not to say") 
+```
+
+``` {r}
+Exp_1_data %>% group_by(Gender) %>% count(Gender) %>% kbl %>% kable_styling()
 ```
 
 ## Age demographics 
@@ -223,7 +232,8 @@ contradiction_plot <- ggplot(Exp_1_data, aes(x= Conflict, y= Contradiction, fill
   theme(plot.title = element_text(hjust= 0.5)) + 
   theme_minimal() +
   scale_y_continuous(name = "Perceived Contradiction", limits = c(0,30)) + 
-  scale_fill_manual(values=c("slategray2", "lightpink1"))
+  scale_fill_manual(values=c("slategray2", "lightpink1")) +
+  easy_remove_legend()
 
 print(contradiction_plot)
 ```
@@ -242,7 +252,8 @@ advancement_plot <- ggplot(Exp_1_data, aes(x= Conflict, y= advancement, fill = C
   theme(legend.position = "none") + 
    theme_minimal() +
   geom_crossbar(stat="summary", fun.y= "mean_ci", fill = "white", alpha = 0.7, width = 0.8) + 
-  scale_fill_manual(values=c("slategray2", "lightpink1"))
+  scale_fill_manual(values=c("slategray2", "lightpink1")) +
+  easy_remove_legend()
 
 print(advancement_plot)
 ```
@@ -260,7 +271,8 @@ confusion_plot <- ggplot(Exp_1_data, aes(x= Conflict, y = confusion, fill = Conf
   theme_minimal() +
   geom_beeswarm(cex = 0.2) +
   geom_crossbar(stat="summary", fun.y= "mean_ci", fill = "white", alpha = 0.7, width = 0.6)  +
-  scale_fill_manual(values=c("slategray2", "lightpink1"))
+  scale_fill_manual(values=c("slategray2", "lightpink1"))+
+  easy_remove_legend()
 
 print(confusion_plot)
 ```
