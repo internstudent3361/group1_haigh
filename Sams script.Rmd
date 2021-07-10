@@ -620,3 +620,4 @@ combinedplots <- (confusionplot | backlashplot)/(mistrustplot | confidenceplot)/
 print(combinedplots)
 ```
 
+
