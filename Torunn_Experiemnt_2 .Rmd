@@ -230,7 +230,7 @@ development_means
 
 ## Nutritional Confusion Plot 
 
-```{r}
+```{r, warning=FALSE}
 nutritional_confusion_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = confusion, fill = Conflict)) +
   geom_violin() + 
   facet_wrap(vars(Format), strip.position= "bottom") + 
@@ -252,7 +252,7 @@ print(nutritional_confusion_plot)
 
 ## Nutritional Backlash Plot 
 
-```{r}
+```{r, warning=FALSE}
 nutritional_backlash_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = backlash, fill = Conflict)) +
   geom_violin() + 
   facet_wrap(vars(Format), strip.position= "bottom") + 
@@ -269,7 +269,7 @@ nutritional_backlash_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = backlash, f
 print(nutritional_backlash_plot)
 ```
 ## Mistrust of Expertise Plot 
-```{r}
+```{r, warning=FALSE}
 mistrust_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = mistrust, fill = Conflict)) +
   geom_violin() + 
   facet_wrap(vars(Format), strip.position= "bottom") + 
@@ -286,7 +286,7 @@ mistrust_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = mistrust, fill = Confli
 print(mistrust_plot)
 ```
 ## Confidence in Scientific Community Plot 
-```{r}
+```{r, warning=FALSE}
 confidence_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = confidence, fill = Conflict)) +
   geom_violin() + 
   facet_wrap(vars(Format), strip.position= "bottom") + 
@@ -305,7 +305,7 @@ print(confidence_plot)
 
 ## Certainty of Knowledge Plot 
 
-```{r}
+```{r, warning=FALSE}
 certainty_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = certainty, fill = Conflict)) +
   geom_violin() + 
   facet_wrap(vars(Format), strip.position= "bottom") + 
@@ -325,13 +325,13 @@ print(certainty_plot)
 
 ## Development of Knowledge Plot 
 
-```{r}
+```{r, warning=FALSE}
 development_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = development, fill = Conflict)) +
   geom_violin() + 
   facet_wrap(vars(Format), strip.position= "bottom") + 
   ggtitle(label= "Development of Knowledge") + 
+  easy_center_title() + 
   scale_y_continuous(name= "Development of Knowledge", limits= c(1,5)) +
-  theme(plot.title = element_text(hjust = 0.5)) + 
   theme(legend.position = "none") +
   theme_minimal() +
   geom_beeswarm(cex = 0.2) +
@@ -344,7 +344,7 @@ print(development_plot)
 
 ## Combine plots together 
 
-```{r}
+```{r, fig.width = 10, fig.height= 10, warning=FALSE}
 combine_plots <- nutritional_confusion_plot + nutritional_backlash_plot + mistrust_plot + confidence_plot + certainty_plot + development_plot + plot_layout(ncol = 2)
 
 print(combine_plots)
