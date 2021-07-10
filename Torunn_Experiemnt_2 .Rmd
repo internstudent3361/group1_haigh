@@ -1,0 +1,356 @@
+---
+title: "Verification Report - Experiment 2"
+author: "Torunn Briers"
+date: "06/07/2021"
+output:
+  html_document:
+    theme: "cosmo"
+    toc: true
+    toc_float: true
+---
+<style type="text/css">
+body {
+  font-size: 11pt;
+}
+h1 {
+  font-size: 18pt;
+}
+h2 {
+  font-size: 15pt;
+}
+</style>
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Set up and tidy data
+
+## Loading packages 
+
+- Not sure what packages I'll need at this point so starting with the same ones used in Experiment 1 
+```{r, results='hide', message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(janitor)
+library(ggeasy)
+library(ggbeeswarm)
+library(kableExtra)
+library(devtools)
+library(psych)
+library(qualtRics)
+library(patchwork)
+```
+
+## Reading the data
+```{r, results='hide', message=FALSE, warning=FALSE}
+Exp_2_data <- read_csv(file= "./data/Study_2_data.csv") 
+```
+
+
+## Remove lines 2 and 3 
+```{r, results='hide', message=FALSE, warning=FALSE}
+Exp_2_data = read_survey("./data/Study_2_data.csv")
+```
+
+## Make data into a data fram 
+```{r, results='hide', message=FALSE, warning=FALSE}
+Exp_2_data <- as.data.frame(Exp_2_data) 
+```
+
+
+## Rename incomprehensible variable names 
+```{r, results='hide', message=FALSE, warning=FALSE}
+Exp_2_data <- Exp_2_data %>% 
+  rename(recall_score = SC0, condition = FL_12_DO, confidence = GSS) 
+```
+
+## Planned exclusions 
+```{r, results='hide', message=FALSE, warning=FALSE}
+Exp_2_data <- Exp_2_data %>%
+  filter(Finished == 1, Serious_check == 1, recall_score >= 4) 
+```
+
+## Select sub-set of data 
+```{r, results='hide', message=FALSE}
+Exp_2_data <- Exp_2_data %>% select(Finished, 'Duration (in seconds)', Gender, Age, Serious_check, recall_score, condition, NC_1:Development_sci_know_6)
+```
+
+
+# Demographic statistics
+
+## Check no. of participants 
+
+**No. of participants: 400** 
+```{r, results='hide', message=FALSE}
+count(Exp_2_data)
+```
+
+## Gender identity of partipants 
+
+- By looking at the survey (provided in the OSF files) I could see that males were coded as 1, females as 2, 'other' as 3 
+- **No. of male participants: 150**
+- **No. of female participants: 248** 
+- **No. of 'other' participants: 2** 
+
+Before counting gender I change the names of the Gender variables to 'male, 'female' and 'other' so that the following table is more clear.
+``` {r}
+Exp_2_data$Gender <- recode_factor(Exp_2_data$Gender,
+                                   '1' = "Male",
+                                   '2' = "Female",
+                                   '3' = "Other",
+                                   '4' = "Prefer not to say") 
+```
+
+``` {r}
+Exp_2_data %>% group_by(Gender) %>% 
+  count(Gender) %>% 
+  kbl %>% 
+  kable_styling()
+
+```
+
+## Age demographics 
+
+- **Mean Age: 33.5, SD: 12, Age Range: 18-73**
+- The mean, standard deviation and range of the age of participants is calculated using the `summarise()` function. I installed and loaded the "kableExtra" package to use the functions `kbl` and `kable_styling()` to put my results in a nice table.
+
+```{r}
+Exp_2_data %>% summarise(mean_age = mean(Age),
+                         SD = sd(Age), 
+                         min_age = min(Age), 
+                         max_age = max(Age)
+                         ) %>% kbl %>% kable_styling()
+```
+
+
+## Changing and creating variables
+
+### Separating the IVs
+```{r, results='hide', message=FALSE}
+
+Exp_2_data <- Exp_2_data %>% 
+  separate(col = condition, into = c("block", "number", "Format", "Conflict"))
+```
+
+### Changing IVs from characters to factors 
+```{r, results='hide', message=FALSE}
+Exp_2_data$Format <- as.factor(Exp_2_data$Format)
+
+Exp_2_data$Conflict <- as.factor(Exp_2_data$Conflict)
+```
+
+### Renaming factors of 'Conflict'
+```{r,results='hide', message=FALSE}
+Exp_2_data$Conflict <- recode_factor(Exp_2_data$Conflict,
+                                      Conflict = "Conf.",
+                                      Consistent = "Non-Conf.")
+```
+
+# Descriptives (Experiemnt 2)
+
+## Create new columns/variables for each of the DVs
+
+- Need to sum all responses for each DV and then divide by no. of responses
+  - i.e. For the nutritional confusion score, participants responded to 6 questions about the degree to which they find nutrition recommendations to be confusing. We find their average score by suming their responses to each question and then divding by the same no.
+
+```{r,results='hide', message=FALSE}
+#nutritional confusion mean
+Exp_2_data$confusion <- ((Exp_2_data$NC_1 + Exp_2_data$NC_2 + Exp_2_data$NC_3 + Exp_2_data$NC_4 + Exp_2_data$NC_5 + Exp_2_data$NC_6)/6)
+```
+
+```{r,results='hide', message=FALSE}
+#nutritional backlash mean
+Exp_2_data$backlash <- ((Exp_2_data$NBS_1 + Exp_2_data$NBS_2 + Exp_2_data$NBS_3 + Exp_2_data$NBS_4 + Exp_2_data$NBS_5 + Exp_2_data$NBS_6)/6)  
+```
+
+```{r,results='hide', message=FALSE}
+#Mistrust of expertise mean
+Exp_2_data$mistrust <- ((Exp_2_data$Mistrust_expertise_1 + Exp_2_data$Mistrust_expertise_2 + Exp_2_data$Mistrust_expertise_3)/3)
+```
+
+```{r,results='hide', message=FALSE}
+#Certainty of knowledge mean
+Exp_2_data$certainty <- ((Exp_2_data$Certainty_sci_know_1 + Exp_2_data$Certainty_sci_know_2 + Exp_2_data$Certainty_sci_know_3 + Exp_2_data$Certainty_sci_know_4 + Exp_2_data$Certainty_sci_know_5 + Exp_2_data$Certainty_sci_know_6)/6)
+```
+
+```{r,results='hide', message=FALSE}
+#Development of knowledge mean
+Exp_2_data$development <- ((Exp_2_data$Development_sci_know_1 + Exp_2_data$Development_sci_know_2 +Exp_2_data$Development_sci_know_3 +Exp_2_data$Development_sci_know_4 +Exp_2_data$Development_sci_know_5 +Exp_2_data$Development_sci_know_6)/6)
+```
+
+## Find the means 
+
+### Nutritional confusion 
+```{r}
+confusion_means <- Exp_2_data %>% 
+  group_by(Conflict) %>% 
+  summarise(mean= mean(confusion, na.rm = TRUE)) 
+
+confusion_means
+```
+
+### Nutritional backlash 
+```{r}
+backlash_means <- Exp_2_data %>% 
+  group_by(Conflict) %>% 
+  summarise(mean= mean(backlash, na.rm = TRUE)) 
+
+backlash_means
+```
+
+### Mistrust of expertise
+```{r}
+mistrust_means <- Exp_2_data %>% 
+  group_by(Conflict) %>% 
+  summarise(mean= mean(mistrust, na.rm = TRUE)) 
+
+mistrust_means
+```
+
+
+### Certainty of knowledge
+```{r}
+certainty_means <- Exp_2_data %>% 
+  group_by(Conflict) %>% 
+  summarise(mean= mean(certainty, na.rm = TRUE)) 
+
+certainty_means
+```
+
+### Development of knowledge
+```{r}
+development_means <- Exp_2_data %>% 
+  group_by(Conflict) %>% 
+  summarise(mean= mean(development, na.rm = TRUE)) 
+
+development_means
+```
+# Figure 3
+
+## Nutritional Confusion Plot 
+
+```{r}
+nutritional_confusion_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = confusion, fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position= "bottom") + 
+  ggtitle(label= "Nutritional Confusion") + 
+  scale_y_continuous(name= "Nutritional Confusion", limits= c(1,5)) +
+  theme(plot.title = element_text(hjust = 1)) + 
+  theme(legend.position = "none") +
+  theme_minimal() +
+  geom_beeswarm(cex = 0.2) +
+  geom_crossbar(stat="summary", fun.y= "mean_ci", fill = "white", alpha = 0.7, width = 0.6)  +
+  scale_fill_manual(values=c("slategray2", "lightpink1"))+
+  easy_remove_legend()
+
+print(nutritional_confusion_plot)
+```
+
+
+
+
+## Nutritional Backlash Plot 
+
+```{r}
+nutritional_backlash_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = backlash, fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position= "bottom") + 
+  ggtitle(label= "Nutritional Backlash") + 
+  scale_y_continuous(name= "Nutritional Backlash", limits= c(1,5)) +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(legend.position = "none") +
+  theme_minimal() +
+  geom_beeswarm(cex = 0.2) +
+  geom_crossbar(stat="summary", fun.y= "mean_ci", fill = "white", alpha = 0.7, width = 0.6)  +
+  scale_fill_manual(values=c("slategray2", "lightpink1"))+
+  easy_remove_legend()
+
+print(nutritional_backlash_plot)
+```
+## Mistrust of Expertise Plot 
+```{r}
+mistrust_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = mistrust, fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position= "bottom") + 
+  ggtitle(label= "Mistrust of Expertise") + 
+  scale_y_continuous(name= "Mistrust of Expertise", limits= c(1,5)) +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(legend.position = "none") +
+  theme_minimal() +
+  geom_beeswarm(cex = 0.2) +
+  geom_crossbar(stat="summary", fun.y= "mean_ci", fill = "white", alpha = 0.7, width = 0.6)  +
+  scale_fill_manual(values=c("slategray2", "lightpink1"))+
+  easy_remove_legend()
+
+print(mistrust_plot)
+```
+## Confidence in Scientific Community Plot 
+```{r}
+confidence_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = confidence, fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position= "bottom") + 
+  ggtitle(label= "Confidence in Scientific Community") + 
+  scale_y_continuous(name= "Confidence in Scientific Community", limits= c(1,3)) +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(legend.position = "none") +
+  theme_minimal() +
+  geom_beeswarm(cex = 0.2) +
+  geom_crossbar(stat="summary", fun.y= "mean_ci", fill = "white", alpha = 0.7, width = 0.6)  +
+  scale_fill_manual(values=c("slategray2", "lightpink1"))+
+  easy_remove_legend()
+
+print(confidence_plot)
+```
+
+## Certainty of Knowledge Plot 
+
+```{r}
+certainty_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = certainty, fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position= "bottom") + 
+  ggtitle(label= "Certainty of Knowledge") + 
+  scale_y_continuous(name= "Certainty of Knowledge", limits= c(1,5)) +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(legend.position = "none") +
+  theme_minimal() +
+  geom_beeswarm(cex = 0.2) +
+  geom_crossbar(stat="summary", fun.y= "mean_ci", fill = "white", alpha = 0.7, width = 0.6)  +
+  scale_fill_manual(values=c("slategray2", "lightpink1"))+
+  easy_remove_legend()
+
+print(certainty_plot)
+```
+
+
+## Development of Knowledge Plot 
+
+```{r}
+development_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = development, fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position= "bottom") + 
+  ggtitle(label= "Development of Knowledge") + 
+  scale_y_continuous(name= "Development of Knowledge", limits= c(1,5)) +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(legend.position = "none") +
+  theme_minimal() +
+  geom_beeswarm(cex = 0.2) +
+  geom_crossbar(stat="summary", fun.y= "mean_ci", fill = "white", alpha = 0.7, width = 0.6)  +
+  scale_fill_manual(values=c("slategray2", "lightpink1"))+
+  easy_remove_legend()
+
+print(development_plot)
+```
+
+## Combine plots together 
+
+```{r}
+combine_plots <- nutritional_confusion_plot + nutritional_backlash_plot + mistrust_plot + confidence_plot + certainty_plot + development_plot + plot_layout(ncol = 2)
+
+print(combine_plots)
+```
+
+
+
+
+
