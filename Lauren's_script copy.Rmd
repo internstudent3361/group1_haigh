@@ -3,7 +3,7 @@ title: "Code"
 author: "Lauren Abdallah"
 date: "03/07/2021"
 output:
-  html_document:
+  html_document: 
     theme: lumen
     toc: true
   pdf_document: default
