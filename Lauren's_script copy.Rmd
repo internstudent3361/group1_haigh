@@ -9,7 +9,7 @@ output:
   pdf_document: default
 ---
 
-# Experiment 1
+# Experiment 1 
  
 ```{r}
 
