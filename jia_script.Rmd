@@ -1,0 +1,769 @@
+---
+title: "Report 2"
+author: "Jia Ni Teo"
+date: "27/06/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Setting Up 
+
+First, we load our libraries:
+- Tidyverse loaded for dplyr, ggplot2. 
+```{r}
+library(tidyverse) 
+library(ggeasy)
+library(ggbeeswarm)
+library(patchwork)
+```
+
+## Step 2: Load data from CSV files
+```{r}
+expone <- "Study 8 data.csv" %>% 
+  read_csv() %>% 
+  rename(
+    recall_score = SC0, #nicer name for recall score
+    condition = FL_10_DO #nicer name for condition
+  )
+
+exptwo <- "Study 7 data.csv" %>% 
+  read_csv()
+
+```
+
+# Experiment 1
+
+- Calculate Mean, SD, Range & Count Males/Females
+- Number of participants: 294 (126 males, 168 females)
+- Age: (Mean: 34.29, SD: 12.97, Range: 18-69)
+```{r}
+# Remove first 2 rows of data as they do not include data
+expone <- expone %>% 
+  slice(-1:-2)
+
+# List all duplicate IDs
+expone$Prolific_PID[duplicated(expone$Prolific_PID)] #59 duplicates found
+
+# Removing second attempts for 59 duplicate IDs 
+expone <- expone[!duplicated(expone$Prolific_PID), ]
+
+# We end up with n = 312, which corresponds to paper's total n 
+```
+
+
+```{r}
+# Apply pre-registered exclusion criteria - if they did not complete the task, declared they did not respond seriously, failed an attention check by recalling <4 headlines 
+exponefinal <- expone %>% 
+  filter(
+    Consent == "1", #filter to include those who consented
+    Finished == "1", #filter to include those who Finished
+    Serious_check == "1", #filter to include those who answered they passed Serious Check
+    recall_score >= "4", #filter to include recalls core 4 and above only
+    )
+
+exponefinaldata <- subset(
+  exponefinal, select = c (Finished, `Duration (in seconds)`, Gender, Age, Serious_check, recall_score, condition, contradiction_1:advancement)
+)
+
+# Count final participant n in Exp 1
+exponefinaldata %>% 
+  count(Serious_check)
+```
+
+First, use the mutate() to rename "1" to male and "2" to female under the Gender variable.
+Then, we use count() to count total n for male and female.
+```{r}
+exponefinaldata <- mutate(
+ exponefinaldata, 
+ Gender = ifelse(exponefinaldata$Gender==1, "male", "female")
+)
+
+# Count males and females
+exponefinaldata %>% 
+  count(
+    Gender
+  )
+```
+
+First, we use as.numeric() to change the Age variable for Chr to Numeric.And then, we use summarise() to get mean, SD, min and max in a single line of code.
+
+```{r}
+# Other descriptive statistics
+exponefinaldata$Age <- as.numeric(exponefinal$Age) #change from Character to Numeric
+
+exponefinaldata %>% 
+  summarise(
+    Mean = mean(Age),
+    SD = sd(Age),
+    Min = min(Age),
+    Max = max(Age)
+) %>% 
+  as.data.frame() #display as data frame as tibble automatically rounds up and we would like to print decial places
+```
+
+## Descriptive stats for each variable measured in Experiment 1 (Figure 1)
+```{r}
+#Contradiction Plot
+# Change from Chr to Numberic for all contradiction variables
+exponefinaldata$contradiction_1 <- as.numeric(exponefinaldata$contradiction_1)
+exponefinaldata$contradiction_2 <- as.numeric(exponefinaldata$contradiction_2)
+exponefinaldata$contradiction_3 <- as.numeric(exponefinaldata$contradiction_3)
+exponefinaldata$contradiction_4 <- as.numeric(exponefinaldata$contradiction_4)
+exponefinaldata$contradiction_5 <- as.numeric(exponefinaldata$contradiction_5)
+exponefinaldata$contradiction_6 <- as.numeric(exponefinaldata$contradiction_6)
+
+# Change from Chr to Factor to allow grouping in the plot
+exponefinaldata$condition <- as.factor(exponefinaldata$condition)
+
+#Sum contradiction variables into a new variable 'Contradiction'
+exponefinaldata <- exponefinaldata %>% 
+  rowwise() %>% 
+  mutate(
+    contradiction = sum(contradiction_1, contradiction_2, contradiction_3, contradiction_4, contradiction_5, contradiction_6)
+  )
+```
+
+```{r}
+#Replicate Condition column so that we can separate it into 4 variables
+exponefinaldata <- exponefinaldata %>%  
+  mutate(
+    condition2 = condition
+)
+```
+
+```{r}
+#Separate the data into 4 columns
+exponefinaldata <- separate(data = exponefinaldata, col = condition2, into = c("block", "number", "format", "conflict"))
+
+#Convert format and conflict to Factors
+exponefinaldata$format <- as.factor(exponefinaldata$format)
+exponefinaldata$conflict <- as.factor(exponefinaldata$conflict)
+```
+
+```{r}
+#Rename from Conflict/Consistent to Conf./Non-Conf.
+levels(exponefinaldata$conflict)[levels(exponefinaldata$conflict)=="Conflict"] <- "Conf."
+levels(exponefinaldata$conflict)[levels(exponefinaldata$conflict)=="Consistent"] <- "Non-Conf."
+```
+
+
+```{r}
+#Plot Contradiction
+contradiction <- ggplot(
+  data = exponefinaldata,
+  aes(
+    x = conflict,
+    y = contradiction,
+    fill = conflict
+  )
+)  + 
+  geom_violin() +
+  ggtitle(
+    label = "Contradiction"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5) #center the plot title
+  ) +
+  scale_x_discrete(
+    name = NULL
+  ) +
+  scale_y_continuous(
+    name = "Perceived Contradiction",
+    limits = c(0,30)
+  ) +
+  facet_wrap(
+    vars(format),
+    strip.position = "bottom"
+  ) +
+  stat_summary( #adding crossbars to indicate mean and 95% confidence intervals
+    fun.data = "mean_cl_normal",  #from the Hmisc package, mean_cl_normal function used to calculate and display 95% CIs
+    geom = "crossbar", #specifying we want crossbars
+    fill = "white",    #changing crossbar fill colour
+    alpha = .7 #changes transparency of fill to 70%
+  ) +
+  easy_remove_legend() +
+  geom_beeswarm(
+    cex = 0.2 #add a bee swarm plot (one-dimensional scatter plot) to show all data points, cex specified width
+    ) + 
+  scale_fill_manual(
+    values = c("slategray2", "lightpink1") #change violin plot fill colours
+  )
+            
+plot(contradiction)
+```
+
+```{r}
+#Plot Confusion
+exponefinaldata$confusion <- as.numeric(exponefinaldata$confusion)
+
+confusion <- ggplot(
+  data = exponefinaldata,
+  aes(
+    x = conflict,
+    y = confusion,
+    fill = conflict
+  )
+)  + 
+  geom_violin() +
+  ggtitle(
+    label = "Confusion"
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5) #center the plot title
+  ) +
+  scale_x_discrete(
+    name = NULL
+  ) +
+  scale_y_continuous(
+    name = "Perceived Confusion"
+  ) +
+  facet_wrap(
+    vars(format),
+    strip.position = "bottom"
+  ) +
+  stat_summary( #adding crossbars to indicate mean and 95% confidence intervals
+    fun.data = "mean_cl_normal",  #from the Hmisc package, mean_cl_normal function used to calculate and display 95% CIs
+    geom = "crossbar", #specifying we want crossbars
+    fill = "white",    #changing crossbar fill colour
+    alpha = .7 #changes transparency of fill to 70%
+  ) +
+  easy_remove_legend() +
+  geom_beeswarm(
+    cex = 0.2 #add a bee swarm plot (one-dimensional scatter plot) to show all data points, cex specified width
+    ) + 
+  scale_fill_manual(
+    values = c("slategray2", "lightpink1") #change violin plot fill colours
+  )
+
+plot(confusion)
+```
+
+```{r}
+#Plot Advancement
+exponefinaldata$advancement <- as.numeric(exponefinaldata$advancement)
+
+advancement <- ggplot(
+  data = exponefinaldata,
+  aes(
+    x = conflict,
+    y = advancement,
+    fill = conflict
+  )
+)  + 
+  geom_violin() +
+  ggtitle(
+    label = "Advancement" #plot title
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5) #center the plot title
+  ) +
+  scale_x_discrete(
+    name = NULL #remove label for x-axis
+  ) +
+  scale_y_continuous(
+    name = "Perceived Scientific Advancement" #Label for y-axis
+  ) +
+  facet_wrap(
+    vars(format), #facet wrap Genetic/Qualified
+    strip.position = "bottom"
+  ) +
+  stat_summary( #adding crossbars to indicate mean and 95% confidence intervals
+    fun.data = "mean_cl_normal",  #from the Hmisc package, mean_cl_normal function used to calculate and display 95% CIs
+    geom = "crossbar", #specifying we want crossbars
+    fill = "white",    #changing crossbar fill colour
+    alpha = .7 #changes transparency of fill to 70%
+  ) +
+  easy_remove_legend()+
+  geom_beeswarm(
+    cex = 0.2 #add a bee swarm plot (one-dimensional scatter plot) to show all data points, cex specified width
+    ) + 
+  scale_fill_manual(
+    values = c("slategray2", "lightpink1") #change violin plot fill colours
+  )
+
+plot(advancement)
+```
+
+Here we are using the Patchwork package's plot_layout function to put all 3 plots together!
+```{r}
+combinedplot1 <- contradiction + advancement + confusion + plot_layout(ncol = 2)
+
+plot (combinedplot1)
+```
+
+#Next: Histogram displaying number of participants in each condition who felt the body of research reported in the headlines resulted in us knowing more than before, less than before, or the same as before
+
+This follows on from the Advancement plot, whereby participants rated -1 (less), 0 (same), or 1 (more). The first step is using the function ordered(), we can specify the levels of advancement (-1, 0, 1) and label them accordingly (less, same, more). I named this new object 'ordered_advancement'. 
+
+Next, we plot the histogram using ggplot2's geom_bar. Firstly, the data is specified using 'exponefinaldata' and within the aes argument, we specify the x-axis variable as 'ordered_advancement', and group/fill using both the conditions conflict and format by stating as 'conflict:format'. Geom_bar is used to produce the histogram, specifying the argument position="dodge" to place the histogram bars side by side (the default is set to "stack"). 
+
+Finally, we format the histogram. We use the function scale_fill_grey() to specify the colour scheme, then change the title of the legend to "Condition" and rename the short-formed labels to long-form by stating using the labels argument. X-axis legend is also named "Advancement", as well as changing the labels to capitalise (Less, Same, More); Y-axis legend is named "Number of Participants".
+
+```{r}
+ordered_advancement <- ordered(
+  exponefinaldata$advancement,
+  levels = c(-1, 0, 1),
+  labels = c("less", "same", "more")
+)
+
+advancement_histogram <- ggplot(
+  data = exponefinaldata,
+  aes(
+    x = ordered_advancement,
+    group = conflict:format,
+    fill = conflict:format
+    )
+) +
+  geom_bar (
+    position = "dodge" #places bars side by side
+) +
+  scale_fill_grey( #change colour scheme to grayscale
+    name = "Condition",
+    labels = c("Conflicting/Generic",
+               "Conflicting/Qualified",
+               "Non-conflicting/Generic",
+               "Non-conflicting/Qualified"
+               )
+  ) + 
+  scale_x_discrete(
+    name = "Advancement",
+    labels = c("Less",
+               "Same",
+               "More"
+               )
+  ) +
+  scale_y_continuous(
+    name = "Number of Participants",
+  ) 
+
+plot(advancement_histogram)
+```
+
+# Experiment 2
+
+Next, loading the data file for Experiment 2:
+- Creating it as an object in our environment named 'exptwo'.
+- Read the CSV 
+- Rename SC0 to recall_score; FL_10_D0 to condition using the rename()
+```{r}
+exptwo <- "Study 7 data.csv" %>% 
+  read_csv() %>% 
+  rename(
+    recall_score = SC0, #nicer name for recall score
+    condition = FL_12_DO #nicer name for condition
+  )
+```
+
+## Tidying up the Data
+1. First, I'll remove the first 2 rows of the data file as it does not contain participants' data. I will use slice() for this purpose
+2. As the data file contains a lot of unneeded data (it has 360 columns!) for the purpose of verifying the descriptive statistics, I am going to tidy up the data by reducing the number of variables displayed. This will allow us to more easily work with it.
+3. Using the glimpse() we now see that columns have reduced to 38, and we can 
+```{r}
+exptwo <- exptwo %>% 
+  slice(-1:-2) %>% 
+  select(Consent, Finished, Gender, Age, NC_1:condition)
+
+glimpse(exptwo)
+```
+
+4. I'm checking for duplicate IDs by specifying Prolific_PID and checking for duplicated - 3 duplicate ID found.
+5. Removing this duplicate ID from the data set.
+```{r}
+exptwo$Prolific_PID[duplicated(exptwo$Prolific_PID)]
+
+exptwo <- exptwo[!duplicated(exptwo$Prolific_PID), ]
+```
+
+6. Apply pre-registered exclusion criteria using filter(): exclude participants if they did not complete the task, declared they did not respond seriously, or failed an attention check (i.e. recalled <4 headlines correctly during headline recall task). I am creating this final data set as an object called 'exptwofinaldata'
+7. Lastly, using count() we can see how many final participants are included in our data set (n=400)
+```{r}
+exptwofinaldata <- exptwo %>% 
+  filter(
+    Consent == "1", #filter to include those who consented
+    Finished == "1", #filter to include those who Finished
+    Serious_check == "1", #filter to include those who answered they passed Serious Check
+    recall_score >= "4", #filter to include recalls core 4 and above only
+    )
+
+exptwofinaldata %>% 
+  count (Consent)
+```
+
+## Count Males/Females
+
+According to the paper:
+- Number of participants in FINAL sample: 400 (150 males, 248 females, 2 neither)
+- Age (Mean: 33.5, SD: 12, Range: 18-73)
+
+1. Since Gender is a Factor variable, I am changing to Gender variable from Character to Factor.
+2. Then, I am using mutate() to replace the existing Gender variable with "1" as male and "2" as female. I do this by specifying with case_when() replacing 1 with Male and 2 with Female.
+3. Finally, using count() we can display the respective numbers of malees and females. The count corresponds with our paper's reporting of 150 identifying as male, 248 females and 2 neither of those categories.
+
+```{r}
+exptwofinaldata$Gender <- as.factor(exptwofinaldata$Gender)
+
+exptwofinaldata %>% 
+  mutate(
+    Gender = case_when(
+      Gender == 1 ~ "Male",
+      Gender == 2 ~ "Female"
+    )
+  )
+
+exptwofinaldata %>% 
+  count(Gender)
+```
+
+## Calculate Mean, SD & Range for Total Participants  
+
+1. First, I am changing the Age variable from Chr to Dbl, since it is a numeric variable.
+2. Then, I am using the summarise() to display the mean, SD and range for the Age data. I am specifying the data to display as a data frame so it displays all the decimal points (in a tibble it automatically rounds up).
+3. Hooray! This matches with our paper's report of Mean = 33.5, SD = 12 and Range = 18-73.
+
+```{r}
+exptwofinaldata$Age <- as.numeric(exptwofinaldata$Age)
+
+exptwofinaldata %>% 
+  summarise(
+    Mean = mean(Age),
+    SD = sd(Age),
+    Min = min(Age),
+    Max = max(Age)
+) %>% 
+  as.data.frame()
+```
+
+## Reproducing Figure 3
+
+### Setting Up the Data
+
+1. Figure 3 is about plotting each variable (Nutritional Confusion, Nutritional Backlash, Mistrust of Expertise, Confidence in Scientific Community, Certainty of Knowledge, & Development of Knowledge) in Experiment 2.
+2. Similar to Experiment 1, we need to split participants' conditions into 4 variables as it is currently recorded as one variable Block_Number_Format_Conflict. We do this via separate(), specifying the data and column and into new columns 'block', 'number', 'format' and 'conflict. Of particular interest when plotting will be the latter two.
+3. Since these are factor variables, I am changing 'Format' and 'Conflict' from Chr to Factor.
+
+```{r}
+exptwofinaldata <- separate(data = exptwofinaldata, col = condition, into = c("block", "number", "format", "conflict"))
+
+exptwofinaldata$format <- as.factor(exptwofinaldata$format)
+exptwofinaldata$conflict <- as.factor(exptwofinaldata$conflict)
+```
+
+4. Since there were multiple questions asked for each variable, we need to calculate the participants' average scores for each variable. First, we will need to change all the corresponding data to numeric from character.
+5. I am going to do this by using mutate() to create a new variable to represent the average scores of each (confusion, backlash, mistrust, confidence, certainty, development). And then using XXXX to calculate the average using each individual scores totaled divided by number of questions asked. 
+6. Lastly, I'm showing the tibble from format to development (using select() format:development). This shows us the data we will need for our plotting next!
+
+```{r}
+# Calculate participants' average scores as a new variable for each of the 6 variables studied
+exptwofinaldata$NC_1 <- as.numeric(exptwofinaldata$NC_1)
+exptwofinaldata$NC_2 <- as.numeric(exptwofinaldata$NC_2)
+exptwofinaldata$NC_3 <- as.numeric(exptwofinaldata$NC_3)
+exptwofinaldata$NC_4 <- as.numeric(exptwofinaldata$NC_4)
+exptwofinaldata$NC_5 <- as.numeric(exptwofinaldata$NC_5)
+exptwofinaldata$NC_6 <- as.numeric(exptwofinaldata$NC_6)
+exptwofinaldata$NBS_1 <- as.numeric(exptwofinaldata$NBS_1)
+exptwofinaldata$NBS_2 <- as.numeric(exptwofinaldata$NBS_2)
+exptwofinaldata$NBS_3 <- as.numeric(exptwofinaldata$NBS_3)
+exptwofinaldata$NBS_4 <- as.numeric(exptwofinaldata$NBS_4)
+exptwofinaldata$NBS_5 <- as.numeric(exptwofinaldata$NBS_5)
+exptwofinaldata$NBS_6 <- as.numeric(exptwofinaldata$NBS_6)
+exptwofinaldata$Mistrust_expertise_1 <- as.numeric(exptwofinaldata$Mistrust_expertise_1)
+exptwofinaldata$Mistrust_expertise_2 <- as.numeric(exptwofinaldata$Mistrust_expertise_2)
+exptwofinaldata$Mistrust_expertise_3 <- as.numeric(exptwofinaldata$Mistrust_expertise_3)
+exptwofinaldata$GSS <- as.numeric(exptwofinaldata$GSS)
+exptwofinaldata$Certainty_sci_know_1 <- as.numeric(exptwofinaldata$Certainty_sci_know_1)
+exptwofinaldata$Certainty_sci_know_2 <- as.numeric(exptwofinaldata$Certainty_sci_know_2)
+exptwofinaldata$Certainty_sci_know_3 <- as.numeric(exptwofinaldata$Certainty_sci_know_3)
+exptwofinaldata$Certainty_sci_know_4 <- as.numeric(exptwofinaldata$Certainty_sci_know_4)
+exptwofinaldata$Certainty_sci_know_5 <- as.numeric(exptwofinaldata$Certainty_sci_know_5)
+exptwofinaldata$Certainty_sci_know_6 <- as.numeric(exptwofinaldata$Certainty_sci_know_6)
+exptwofinaldata$Development_sci_know_1 <- as.numeric(exptwofinaldata$Development_sci_know_1)
+exptwofinaldata$Development_sci_know_2 <- as.numeric(exptwofinaldata$Development_sci_know_2)
+exptwofinaldata$Development_sci_know_3 <- as.numeric(exptwofinaldata$Development_sci_know_3)
+exptwofinaldata$Development_sci_know_4 <- as.numeric(exptwofinaldata$Development_sci_know_4)
+exptwofinaldata$Development_sci_know_5 <- as.numeric(exptwofinaldata$Development_sci_know_5)
+exptwofinaldata$Development_sci_know_6 <- as.numeric(exptwofinaldata$Development_sci_know_6)
+
+exptwofinaldata <- exptwofinaldata %>% 
+  mutate (
+    confusion = ((exptwofinaldata$NC_1 + exptwofinaldata$NC_2 + exptwofinaldata$NC_3 + exptwofinaldata$NC_4 + exptwofinaldata$NC_5 + exptwofinaldata$NC_6)/6),
+    backlash = ((exptwofinaldata$NBS_1 + exptwofinaldata$NBS_2 + exptwofinaldata$NBS_3 + exptwofinaldata$NBS_4 + exptwofinaldata$NBS_5 + exptwofinaldata$NBS_6)/6),
+    mistrust = ((exptwofinaldata$Mistrust_expertise_1 + exptwofinaldata$Mistrust_expertise_2 + exptwofinaldata$Mistrust_expertise_3)/3),
+    confidence = exptwofinaldata$GSS,
+    certainty = ((exptwofinaldata$Certainty_sci_know_1 + exptwofinaldata$Certainty_sci_know_2 + exptwofinaldata$Certainty_sci_know_3 + exptwofinaldata$Certainty_sci_know_4 + exptwofinaldata$Certainty_sci_know_5 + exptwofinaldata$Certainty_sci_know_6)/6),
+    development = ((exptwofinaldata$Development_sci_know_1 + exptwofinaldata$Development_sci_know_2 + exptwofinaldata$Development_sci_know_3 + exptwofinaldata$Development_sci_know_4 + exptwofinaldata$Development_sci_know_5 + exptwofinaldata$Development_sci_know_6)/6)
+    )
+
+exptwofinaldata %>% 
+  select(format:development)
+```
+
+### Plotting the Figure
+
+#### Nutritional Confusion
+
+1. I am going to create an object called 'confusion' for this plot.
+2. Using ggplot, I am first specifying the data for x axis (conflict), y axis (nutrition confusion), and filling according to conflict. We then make this a violin plot using geom_violin(). 
+3. Then we use facet_wrap() and define the faceting groups using the vars object. I want the faceting group to be Generic/Qualified, so we set this based on 'format (of condition participants were in)'.
+4. This produces a rough plot of how we want the plot to look like, and we want to add the swarm plots (using geom_beeswarm() from ggbeeswam package), 95% CI and mean (using stat_summary) onto the violin plots. 5. The final steps include formatting the axes, remove the legends and adding a title. I am using scale_y_continuous to label the Y-axis, and then using functions from ggeasy package to center title, remove legend, and remove x-axis label. Finally scale_fill_manual is used to select the desired colour that matches our original authors' plots.
+
+```{r}
+confusion <- ggplot(
+  data = exptwofinaldata,
+  aes(
+    x = conflict,
+    y = confusion,
+    fill = conflict
+  ) 
+) + 
+  geom_violin() +
+  facet_wrap(
+    vars(format),
+    strip.position = "bottom" #moves strip to bottom
+  ) +
+  stat_summary(
+    fun.data = "mean_cl_normal",
+    geom = "crossbar", #specifying we want crossbars
+    fill = "white",    #changing crossbar fill colour
+    alpha = .7 #changes transparency of fill to 70%
+  ) +
+  geom_beeswarm(
+    cex = 0.2 #add a bee swarm plot (one-dimensional scatter plot) to show all data points, cex specified width
+    ) +
+  ggtitle(
+    label = "Nutritional Confusion"
+  ) +
+  easy_center_title() +
+  easy_remove_legend() +
+  easy_remove_x_axis(
+    what = c("title")
+  ) +
+  scale_y_continuous(
+    name = "Nutritional Confusion"
+  ) +
+  scale_fill_manual(
+    values = c("slategray2", "lightpink1") #change violin plot fill colours
+  ) 
+  
+plot(confusion)  
+```
+
+6. Now, plotting the remaining plots.
+```{r}
+backlash <- ggplot(
+  data = exptwofinaldata,
+  aes(
+    x = conflict,
+    y = backlash,
+    fill = conflict
+  ) 
+) + 
+  geom_violin() +
+  facet_wrap(
+    vars(format),
+    strip.position = "bottom" #moves strip to bottom
+  ) +
+  stat_summary(
+    fun.data = "mean_cl_normal",
+    geom = "crossbar", #specifying we want crossbars
+    fill = "white",    #changing crossbar fill colour
+    alpha = .7 #changes transparency of fill to 70%
+  ) +
+  geom_beeswarm(
+    cex = 0.2 #add a bee swarm plot (one-dimensional scatter plot) to show all data points, cex specified width
+    ) +
+  ggtitle(
+    label = "Nutritional Backlash"
+  ) +
+  easy_center_title() +
+  easy_remove_legend() +
+  easy_remove_x_axis(
+    what = c("title")
+  ) +
+  scale_y_continuous(
+    name = "Nutritional Backlash"
+  ) +
+  scale_fill_manual(
+    values = c("slategray2", "lightpink1") #change violin plot fill colours
+  ) 
+  
+plot(backlash)  
+```
+
+```{r}
+mistrust <- ggplot(
+  data = exptwofinaldata,
+  aes(
+    x = conflict,
+    y = mistrust,
+    fill = conflict
+  ) 
+) + 
+  geom_violin() +
+  facet_wrap(
+    vars(format),
+    strip.position = "bottom" #moves strip to bottom
+  ) +
+  stat_summary(
+    fun.data = "mean_cl_normal",
+    geom = "crossbar", #specifying we want crossbars
+    fill = "white",    #changing crossbar fill colour
+    alpha = .7 #changes transparency of fill to 70%
+  ) +
+  geom_beeswarm(
+    cex = 0.2 #add a bee swarm plot (one-dimensional scatter plot) to show all data points, cex specified width
+    ) +
+  ggtitle(
+    label = "Mistrust of Expertise"
+  ) +
+  easy_center_title() +
+  easy_remove_legend() +
+  easy_remove_x_axis(
+    what = c("title")
+  ) +
+  scale_y_continuous(
+    name = "Mistrust of Expertise"
+  ) +
+  scale_fill_manual(
+    values = c("slategray2", "lightpink1") #change violin plot fill colours
+  ) 
+  
+plot(mistrust)  
+```
+
+```{r}
+confidence <- ggplot(
+  data = exptwofinaldata,
+  aes(
+    x = conflict,
+    y = confidence,
+    fill = conflict
+  ) 
+) + 
+  geom_violin() +
+  facet_wrap(
+    vars(format),
+    strip.position = "bottom" #moves strip to bottom
+  ) +
+  stat_summary(
+    fun.data = "mean_cl_normal",
+    geom = "crossbar", #specifying we want crossbars
+    fill = "white",    #changing crossbar fill colour
+    alpha = .7 #changes transparency of fill to 70%
+  ) +
+  geom_beeswarm(
+    cex = 0.2 #add a bee swarm plot (one-dimensional scatter plot) to show all data points, cex specified width
+    ) +
+  ggtitle(
+    label = "Confidence in Scientific Community"
+  ) +
+  easy_center_title() +
+  easy_remove_legend() +
+  easy_remove_x_axis(
+    what = c("title")
+  ) +
+  scale_y_continuous(
+    name = "Confidence in Scientific Community"
+  ) +
+  scale_fill_manual(
+    values = c("slategray2", "lightpink1") #change violin plot fill colours
+  ) 
+  
+plot(confidence)  
+```
+
+
+```{r}
+certainty <- ggplot(
+  data = exptwofinaldata,
+  aes(
+    x = conflict,
+    y = certainty,
+    fill = conflict
+  ) 
+) + 
+  geom_violin() +
+  facet_wrap(
+    vars(format),
+    strip.position = "bottom" #moves strip to bottom
+  ) +
+  stat_summary(
+    fun.data = "mean_cl_normal",
+    geom = "crossbar", #specifying we want crossbars
+    fill = "white",    #changing crossbar fill colour
+    alpha = .7 #changes transparency of fill to 70%
+  ) +
+  geom_beeswarm(
+    cex = 0.2 #add a bee swarm plot (one-dimensional scatter plot) to show all data points, cex specified width
+    ) +
+  ggtitle(
+    label = "Certainty of Knowledge"
+  ) +
+  easy_center_title() +
+  easy_remove_legend() +
+  easy_remove_x_axis(
+    what = c("title")
+  ) +
+  scale_y_continuous(
+    name = "Certainty of Knowledge"
+  ) +
+  scale_fill_manual(
+    values = c("slategray2", "lightpink1") #change violin plot fill colours
+  ) 
+  
+plot(certainty)  
+```
+
+```{r}
+development <- ggplot(
+  data = exptwofinaldata,
+  aes(
+    x = conflict,
+    y = development,
+    fill = conflict
+  ) 
+) + 
+  geom_violin() +
+  facet_wrap(
+    vars(format),
+    strip.position = "bottom" #moves strip to bottom
+  ) +
+  stat_summary(
+    fun.data = "mean_cl_normal",
+    geom = "crossbar", #specifying we want crossbars
+    fill = "white",    #changing crossbar fill colour
+    alpha = .7 #changes transparency of fill to 70%
+  ) +
+  geom_beeswarm(
+    cex = 0.2 #add a bee swarm plot (one-dimensional scatter plot) to show all data points, cex specified width
+    ) +
+  ggtitle(
+    label = "Development of Knowledge"
+  ) +
+  easy_center_title() +
+  easy_remove_legend() +
+  easy_remove_x_axis(
+    what = c("title")
+  ) +
+  scale_y_continuous(
+    name = "Development of Knowledge"
+  ) +
+  scale_fill_manual(
+    values = c("slategray2", "lightpink1") #change violin plot fill colours
+  ) 
+  
+plot(development)  
+```
+
+## Finally, all plots together
+
+I am using the patchwork package's plot_layout function to put all plots together.
+
+```{r}
+combinedplot2 <- confusion + backlash + mistrust + confidence + certainty + development + plot_layout(ncol = 2)
+
+plot (combinedplot2)
+```
+

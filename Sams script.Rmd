@@ -1,0 +1,623 @@
+---
+title: "Attempt 2 - Study 1"
+author: "Samantha"
+date: "24/06/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, messages = FALSE)
+```
+
+# Loading packages
+```{r}
+library(tidyverse)
+library(devtools)
+library(ggplot2)
+library(psych)
+library(tibble)
+library(qualtRics)
+library(dplyr)
+library(ggbeeswarm)
+```
+
+# Experiment 1
+# Reading data 
+First we are going to rename the datafile from "Study_8_data.csv" to "Experiment1". Because the datafile is a csv file, we are going to read the datafile with the function read_csv(). 
+```{r}
+Experiment1 <- "Study_8_data.csv" %>%  
+  read_csv() 
+Experiment1=read_survey("Study_8_data.csv") #needed to exclude the 2 lines 
+```
+
+# Demographics of participants 
+
+```{r}
+## Calculating consented participants 
+Consented_participants <- Experiment1 %>%  
+  filter(Consent == "1") #Filtering to include participants that had given consent 
+count(Consented_participants) #Counting how many participants gave consent 
+```
+
+The authors found a discrepancy between the number of sign-ups (312) and the number of survey responses received (371). This was because 59 participants had received an error message upon completing the study and took it upon themselves to complete the study a second time. 
+The authors could identify participants who completed the survey twice because each participant had a unique Prolific ID so authors could just exclude their second attempt. 
+
+## Unplanned exclusions 
+```{r}
+Experiment1 <- Experiment1[!duplicated(Experiment1$Prolific_PID),] #Removing duplicates of prolific ID
+
+count(Experiment1) #Counting how many participants are left after duplicated ones have been removed (n=312)
+```
+
+## Planned exclusions
+The authors had planned to exclude participants who did not complete the task, did not take the task seriously, and failed the attention check (i.e., those who had recalled less than 4 headlines correctly during a headline recall task). 
+In other words, the remaining participants after exclusion would be those who had:
+* Completed the task
+* Took the task seriously
+* Passed the attention check 
+
+I could not find results for the headline recall test that was used as the attention check in their study. The only reasonable variable was SC0 which had results that ranged from 0 to 7. Let's give that a shot. 
+```{r}
+Experiment1 <- Experiment1 %>% 
+  filter(Finished == "1", #Including participants who had finished experiment 
+         Serious_check == "1", #Including participants who took task seriously 
+         SC0 >= "4") #Including what I think is recall scores more than 4
+
+count(Experiment1) # n=294
+```
+
+So it turns out that SC0 is meant to be recall scores. The other weird name in the table is FL_10_DO, which is the different conditions that participants were exposed to. I'm going to rename both of these. 
+
+```{r}
+Experiment1 <- Experiment1 %>% 
+  rename(recall_score = SC0,
+         condition = FL_10_DO) #new name = old name 
+```
+```{r}
+glimpse(Experiment1) # glimpse to see if renaming worked 
+```
+
+#Demographics of participants
+## Gender 
+
+```{r}
+### Males
+males <- Experiment1 %>% 
+  filter(Gender == "1") #filtering to include only males
+count(males) #counting how many male participants (n=126)
+```
+
+```{r}
+### Females
+females <- Experiment1 %>% 
+  filter(Gender == "2") #filtering to include only females 
+count(females) #counting how many female participants (n=168)
+```
+
+## Age
+```{r}
+Experiment1 %>% 
+  summarise(
+    M.Age = mean(Age), #calculating mean age (34.29)
+    SD = sd(Age), #calculating standard deviation of age (12.97)
+    Max = max(Age), #calculating max age (69)
+    Min = min(Age) #calculating min age (18)
+  )
+```
+
+It seems like the 2 IV's are placed together in the conditions, while in the plots they are separated. So let's try separating the 2 different independent variables (conflict/no conflict and generic/qualified) from each other. 
+
+```{r}
+Experiment1<- separate(data = Experiment1, col = condition, into = c("block", "number", "Format", "Conflict"))
+```
+
+```{r}
+glimpse(Experiment1) #glimpse function to check to see if it was successfully separated 
+```
+
+It also seems like from the authors' descriptive plots, they have renamed the 2 conflict conditions to "Conf." and "Non-Conf." so going to do the same. I had tried running the following code but it didn't work: 
+
+Experiment1$Conflict <- rename(Experiment1$Conflict,
+                               "Conf." = "Conflict",
+                               "Non-Conf." = "Consistent")  
+
+Torunn has suggested another way of doing it. 
+```{r}
+#Attempt 2 at renaming conflict to "Conf." and consistent to "Non-Conf"
+Experiment1$Conflict <- recode_factor(Experiment1$Conflict,
+                                      Conflict = "Conf.",
+                                      Consistent = "Non-Conf.") # old name = "new name"
+```
+
+```{r}
+glimpse(Experiment1) #checking to see if renaming worked
+```
+
+```{r}
+##Setting the new columns as factors 
+Experiment1$Conflict <- as.factor(Experiment1$Conflict) 
+levels(Experiment1$Conflict) #changing variable type of conflict to a factor
+
+Experiment1$Format <- as.factor(Experiment1$Format)
+levels(Experiment1$Format) #changing variable type of conflic to a factor
+```
+
+```{r}
+## Creating a new variable called contradiction 
+
+Experiment1 <- Experiment1 %>% 
+  rowwise() %>% 
+  mutate(contradiction = sum(contradiction_1, contradiction_2, contradiction_3, contradiction_4, contradiction_5,  contradiction_6)) #summing up the 6 contradiction scores from the 6 different headlines that participants were shown
+```
+
+```{r}
+glimpse(Experiment1) #checking to see if it worked 
+```
+
+```{r}
+## Setting DV variable types to  numeric
+Experiment1$contradiction <- as.numeric(as.character(Experiment1$contradiction)) #changing the variable type of contradiction to a numeric 
+
+Experiment1$advancement <- as.numeric(as.character(Experiment1$advancement)) #changing the variable type of advancement to a numeric 
+
+Experiment1$confusion <- as.numeric(as.character(Experiment1$confusion)) #changing the variable type of confusion to a numeric
+```
+
+```{r}
+glimpse(Experiment1)
+```
+
+#Descriptive results 
+##Perceived contradiction 
+In order to check if their manipulation of contradicting headlines had worked, the author had asked participants to rate contradiction of headlines using contradiction scale which ranged from scores 6 to 30. 
+
+We are using function of group_by() and summarise_at() both from the dplyr package. The function group_by() specifies the group we are looking at and converts the existing data frame to only include the specified group. In this case, we are grouping by *conflict*, specifically the conditions of conflict and non-conflict. The function summarise() summarises the columns, and using the argument mean() calculates the mean scores of contradiction. Setting na.rm = TRUE removes all the rows with NA in the data. 
+The manipulation seemed to work with participants exposed to conflicting headlines giving a higher mean rating of contradiction (25.3) than participants exposed to non-conflicting headlines (13.4). 
+```{r}
+contradiction_means <- Experiment1 %>% 
+  group_by(Conflict) %>% 
+  summarise(mean= mean(contradiction, na.rm = TRUE)) 
+```
+
+Secondly, participants were asked to rate their confusion on a 5-point scale with a higher score indicating greater agreement to the statement "The headlines I was asked to remember create confusion about how to be healthy". Participants exposed to conflicting headlines gave an average rating of 4.52 while participants exposed to non-conflicting headlines gave an average rating of 3.65 indicating that participants in the former group were more confused than those in the latter. 
+```{r}
+confusion_means <- Experiment1 %>% 
+  group_by(Conflict) %>% 
+  summarise(mean= mean(confusion, na.rm = TRUE))
+```
+
+Lastly, participants were also asked to rate their advancement of scientific knowledge using a 3-point scale. A score of zero means that participants know the same amount as before, a score of 1 means that they know more than before and a score of -1 means that they know less than before. Participants exposed to non-conflicting headlines gave a higher scientific advancement score (0.007) than participants exposed to conflicting headlines (-0.25), so it seems like the participants in the former group know slightly more than those in the latter. 
+```{r}
+advancement_means <- Experiment1 %>% 
+  group_by(Conflict) %>% 
+  summarise(mean= mean(advancement, na.rm = TRUE))
+```
+
+
+# Descriptive plot
+
+The package needed here is ggplot2.
+
+For each of these plots: 
+We are using the ggplot() function to set the x-axis, the y-axis, and filling the violinplot with colors according to conflict. We are then using geom_violin() to create violinplots, geom_beeswarm() to add dotpoints to the violinplots, and removing the legend of the dotpoints by setting the argument of legend.position to 'none'. 
+To indicate the condition mean and 95% confidence intervals, geom_crossbar() is used. Since we have already set the mapping and data in the ggplot() function, mapping and data are set to NULL. Since we want means and confidence intervals, we set the vector fun.y as "mean_ci". The fill and alpha are adjusted to white and 0.7 respectively to match the aesthetics of the crossbars that authors have used. Additionally, because the variables on the y-axes are continuous, we are using scale_y_continuous 
+Then, using the facet_wrap() function, we are dividing the plots by *format* and changing facet titles to be at the bottom rather than top. Using ggtitle(), we are adding a title for each of these plots ("Contradiction", "Advancement", "Confusion") and the argument plot.title = element_text(hjust= 0.5) within the function theme() allows us to centre the titles. 
+
+```{r}
+# Creating the contradiction plot using ggplot 
+contradictionplot <- ggplot(Experiment1, 
+                  aes(x= Conflict, 
+                  y= contradiction, 
+                  fill = Conflict)) + 
+  geom_violin() + 
+ geom_beeswarm(cex = 0.2) + 
+  theme(legend.position = "none") + 
+  geom_crossbar(mapping = NULL,
+                data = NULL, 
+                stat= "summary", 
+                fun.y = "mean_ci",
+                fill = "white", 
+               alpha = 0.7) +  
+  facet_wrap(vars(Format), strip.position = "bottom") + 
+  ggtitle(label= "Contradiction") + 
+  scale_y_continuous(name = "Perceived Contradiction", 
+                     expand = c(0, 0)) + #violinplot starts from 0
+   theme(plot.title = element_text(hjust= 0.5)) +
+  scale_fill_manual(values = c("slategray2", "lightpink1"))
+print(contradictionplot) 
+```
+
+```{r}
+# Creating the Advancement plot 
+advancementplot <- ggplot(Experiment1,
+                  aes(x= Conflict, 
+                  y= advancement, 
+                  fill = Conflict)) +  
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position = "bottom") + 
+  ggtitle(label= "Advancement") + #adding title
+  scale_y_discrete(name= "Perceived Scientific Advancement") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  geom_beeswarm(cex = 0.2) + 
+  theme(legend.position = "none") + 
+  geom_crossbar(mapping = NULL, 
+                data = NULL,
+                stat="summary",
+                fun.y= "mean_ci",
+                fill = "white", 
+               alpha = 0.7) + 
+  scale_fill_manual(values = c("slategray2", "lightpink1"))
+
+print(advancementplot)
+```
+
+```{r}
+#Creating confusion plot 
+confusionplot <- ggplot(Experiment1, 
+                  aes(x= Conflict,
+                      y = confusion, 
+                      fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position= "bottom") + 
+  ggtitle(label= "Confusion") + 
+  scale_y_continuous(name= "Perceived Confusion",
+                   limits= c(1,5)) + #setting limits from 1 to 5
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(legend.position = "none") + 
+ geom_beeswarm(cex = 0.2) +
+  geom_crossbar(stat="summary", 
+                fun.y= "mean_ci",
+                fill = "white", 
+               alpha = 0.7) +
+  scale_fill_manual(values = c("slategray2", "lightpink1"))
+
+print(confusionplot)
+```
+
+We will then use the package patchwork to put arrange the plots in a 2x1 format like how the authors did in their paper. 
+```{r}
+install.packages("patchwork", repos = "http://cran.us.r-project.org")
+library(patchwork)
+```
+
+```{r}
+combinedplots <- contradictionplot + advancementplot + confusionplot + plot_layout(ncol = 2)
+print(combinedplots)
+```
+
+##Scientific advancement histogram 
+Figure 2 in the paper is a histogram grouping participants from each condition according to their rating of scientific advancement levels (-1, 0, 1).
+Firstly, we are labeling the 3 levels of advancement accordingly (less, same, more respectively). 
+Then, we are using the function geom_bar() from the ggplot2 package. Within the argument of aes, the x-axis is set to advancement levels, and the grouping and colors of the bars are the conditions of conflict and format. The argument position = dodge makes it so that the bars are next to each other rather than stacked on top of each other. Using scale_x_discrete(), we are labeling the x-axis as "Advancement" and setting the discrete labels to Less, Same and More. Then, using scale_y_continuous(), we are labeling the y-axis as "Number of Participants". We are also adding a legend using scale_fill_grey(), setting the legend title as "Condition" and setting the labels as the 4 different conditions "Conflicting/Generic","Conflicting/Qualified", "Non-conflicting/Generic", "Non-conflicting/Qualified". 
+```{r}
+Experiment1$advancement <- ordered(Experiment1$advancement,
+                                   levels = c(-1, 0, 1),
+                                   labels = c("Less", "Same", "More")) #labeling the 3 levels of advancement
+
+xAxisLabels <- c("Less","Same","More")
+
+advancement_histogram <- ggplot(Experiment1) +
+  geom_bar(aes(
+    x= advancement,
+    group = Conflict:Format, 
+    fill = Conflict:Format), 
+    position = "dodge") +
+  scale_x_discrete(name= "Advancement",
+                   labels = xAxisLabels) +
+  scale_y_continuous(name = "Number of Participants") +
+  scale_fill_grey(name = "Condition",
+                  labels = c("Conflicting/Generic",
+                             "Conflicting/Qualified", 
+                             "Non-conflicting/Generic",
+                             "Non-conflicting/Qualified"))
+
+print(advancement_histogram)
+```
+
+# Experiment 2
+
+# Loading packages
+```{r}
+library(tidyverse)
+library(devtools)
+library(ggplot2)
+library(psych)
+library(tibble)
+library(qualtRics)
+library(dplyr)
+library(ggbeeswarm)
+library(patchwork)
+```
+
+# Reading data 
+```{r}
+Experiment2 <- "Study 7 data.csv"  #renaming to experiment2
+Experiment2 <- read.csv(Experiment2) # Reading the data file
+```
+
+# Consented participants 
+```{r}
+Consented_participants <- Experiment2 %>%  
+  filter(Consent == "1") #Filtering to include participants that had given consent 
+count(Consented_participants) #Counting how many participants gave consent n=412
+```
+
+# Exclusion of participants
+```{r}
+Experiment2 <- Experiment2 %>% 
+  filter(Finished == "1", #Including participants who had finished experiment 
+         Serious_check == "1", #Including participants who took task seriously 
+         SC0 >= "4") #Including what I think is recall scores more than 4
+
+count(Experiment2) #(n=400)
+```
+
+# Renaming variables
+```{r}
+Experiment2 <- Experiment2 %>% 
+  rename(recall_score = SC0,
+         condition = FL_12_DO) #new name = old name 
+```
+
+# Demographics of participants
+## Age 
+```{r}
+Experiment2 %>% 
+  summarise(
+    M.Age = mean(Age), #calculating mean age (33.5)
+    SD = sd(Age), #calculating standard deviation of age (12
+    Max = max(Age), #calculating max age (73)
+    Min = min(Age) #calculating min age (18)
+  )
+```
+
+## Gender 
+```{r}
+### Males
+males <- Experiment2 %>% 
+  filter(Gender == "1") #filtering to include only males
+count(males) #counting how many male participants (n=150)
+```
+
+```{r}
+### Females
+females <- Experiment2 %>% 
+  filter(Gender == "2") #filtering to include only females 
+count(females) #counting how many female participants (n=248)
+```
+
+# Separating into columns 
+```{r}
+Experiment2<- separate(data = Experiment2, col = condition, into = c("block", "number", "Format", "Conflict"))
+```
+
+# Renaming levels of conflict 
+```{r}
+Experiment2$Conflict <- recode_factor(Experiment2$Conflict,
+                                      Conflict = "Conf.",
+                                      Consistent = "Non-Conf.") # old name = "new name"
+```
+
+# Set these new IV columns as factors 
+```{r}
+Experiment2$Format <- as.factor(Experiment2$Format)
+levels(Experiment2$Format)
+
+Experiment2$Conflict <- as.factor(Experiment2$Conflict)
+levels(Experiment2$Conflict)
+```
+
+# Changing DV variables from character to numeric 
+Variable types have to be numeric in order to be created into new variables 
+```{r}
+Experiment2 <- Experiment2 %>% 
+     mutate_at(c(325:353), as.numeric) #changing columns 325 to 353 from character to numeric 
+```
+
+# Creating new DV's
+```{r}
+# Nutritional confusion 
+Experiment2 <- Experiment2 %>% 
+  rowwise() %>% 
+  mutate(confusion = sum(NC_1 + NC_2 + NC_3 + NC_4 + NC_5 + NC_6)/6)
+
+# Nutritional backlash 
+Experiment2 <- Experiment2 %>% 
+  rowwise() %>% 
+  mutate(backlash = sum(NBS_1 + NBS_2 + NBS_3 + NBS_4 + NBS_5 + NBS_6)/6)
+ 
+# Mistrust of expertise mean
+Experiment2 <- Experiment2 %>% 
+  rowwise() %>% 
+  mutate(mistrust = sum(Mistrust_expertise_1 + Mistrust_expertise_2 + Mistrust_expertise_3)/3)
+
+# Certainty of knowledge mean
+Experiment2 <- Experiment2 %>% 
+  rowwise() %>% 
+  mutate(certainty = sum(Certainty_sci_know_1 + Certainty_sci_know_2 + Certainty_sci_know_3 + Certainty_sci_know_4 + Certainty_sci_know_5 + Certainty_sci_know_6)/6)
+
+# Development of knowledge mean
+Experiment2 <- Experiment2 %>% 
+  rowwise() %>% 
+  mutate(development = sum(Development_sci_know_1 + Development_sci_know_2 + Development_sci_know_3 + Development_sci_know_4 + Development_sci_know_5 + Development_sci_know_6)/6)
+```
+
+# Descriptive plots 
+```{r}
+# Nutritional confusion plot
+confusionplot <- ggplot(Experiment2, 
+                  aes(x= Conflict, 
+                  y= confusion, 
+                  fill = Conflict)) + 
+  geom_violin() + 
+ geom_beeswarm(cex = 0.2) + 
+  geom_crossbar(mapping = NULL,
+                data = NULL, 
+                stat= "summary", 
+                fun.y = "mean_ci",
+                fill = "white", 
+               alpha = 0.7) +  
+  facet_wrap(vars(Format), strip.position = "bottom") + 
+  ggtitle(label= "Nutritional Confusion") + 
+  scale_y_continuous(name = "Nutritional Confusion", 
+                     expand = c(0, 0)) +
+  scale_fill_manual(values = c("slategray2", "lightpink1")) + 
+  theme(axis.line = element_line(colour = "black")) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust= 0.5)) +
+  theme(legend.position = "none") + 
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+   
+print(confusionplot) 
+```
+
+```{r}
+# Nutritional backlash plot
+backlashplot <- ggplot(Experiment2, 
+                  aes(x= Conflict, 
+                  y= backlash, 
+                  fill = Conflict)) + 
+  geom_violin() + 
+  geom_beeswarm(cex = 0.2) + 
+  geom_crossbar(mapping = NULL,
+                data = NULL, 
+                stat= "summary", 
+                fun.y = "mean_ci",
+                fill = "white", 
+               alpha = 0.7) +  
+  facet_wrap(vars(Format), strip.position = "bottom") + 
+  ggtitle(label= "Nutritional Backlash") + 
+  scale_y_continuous(name = "Nutritional Backlash") +
+  scale_fill_manual(values = c("slategray2", "lightpink1")) +
+  theme(axis.line = element_line(colour = "black")) + #making axis line black
+  theme_bw() + #removing grey background 
+  theme(plot.title = element_text(hjust= 0.5)) +
+  theme(legend.position = "none") + 
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank()) #removing vertical gridlines  
+   
+print(backlashplot) 
+```
+
+```{r}
+# Mistrust of expertise plot
+mistrustplot <- ggplot(Experiment2, 
+                  aes(x= Conflict, 
+                  y= mistrust, 
+                  fill = Conflict)) + 
+  geom_violin() + 
+  geom_beeswarm(cex = 0.2) + 
+  geom_crossbar(mapping = NULL,
+                data = NULL, 
+                stat= "summary", 
+                fun.y = "mean_ci",
+                fill = "white", 
+               alpha = 0.7) +  
+  facet_wrap(vars(Format), strip.position = "bottom") + 
+  ggtitle(label= "Mistrust of Expertise") + 
+  scale_y_continuous(name = "Mistrust of expertise") +
+  scale_fill_manual(values = c("slategray2", "lightpink1")) +
+  theme(axis.line = element_line(colour = "black")) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust= 0.5)) +
+  theme(legend.position = "none") + 
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+   
+print(mistrustplot) 
+```
+
+```{r}
+# Confidence in scientific community plot 
+confidenceplot <- ggplot(Experiment2, 
+                  aes(x= Conflict, 
+                  y= GSS, 
+                  fill = Conflict)) + 
+  geom_violin() + 
+ geom_beeswarm(cex = 0.2) + 
+  geom_crossbar(mapping = NULL,
+                data = NULL, 
+                stat= "summary", 
+                fun.y = "mean_ci",
+                fill = "white", 
+               alpha = 0.7) +  
+  facet_wrap(vars(Format), strip.position = "bottom") + 
+  ggtitle(label= "Confidence in Scientific Community") + 
+  scale_y_continuous(name = "Confidence in Scientific Community") +
+  scale_fill_manual(values = c("slategray2", "lightpink1")) +
+  theme(axis.line = element_line(colour = "black")) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust= 0.5)) +
+  theme(legend.position = "none") + 
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+   
+print(confidenceplot) 
+```
+
+```{r}
+# Certainty of knowledge plot 
+certaintyplot <- ggplot(Experiment2, 
+                  aes(x= Conflict, 
+                  y= certainty, 
+                  fill = Conflict)) + 
+  geom_violin() + 
+ geom_beeswarm(cex = 0.2) + 
+  geom_crossbar(mapping = NULL,
+                data = NULL, 
+                stat= "summary", 
+                fun.y = "mean_ci",
+                fill = "white", 
+               alpha = 0.7) +  
+  facet_wrap(vars(Format), strip.position = "bottom") + 
+  ggtitle(label= "Certainty of Knowledge") + 
+  scale_y_continuous(name = "Certainty of Knowledge") +
+  scale_fill_manual(values = c("slategray2", "lightpink1")) +
+  theme(axis.line = element_line(colour = "black")) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust= 0.5)) +
+  theme(legend.position = "none") + 
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+   
+print(certaintyplot) 
+```
+
+```{r}
+# Development of knowledge plot 
+developmentplot <- ggplot(Experiment2, 
+                  aes(x= Conflict, 
+                  y= development, 
+                  fill = Conflict)) + 
+  geom_violin() + 
+ geom_beeswarm(cex = 0.2) + 
+  geom_crossbar(mapping = NULL,
+                data = NULL, 
+                stat= "summary", 
+                fun.y = "mean_ci",
+                fill = "white", 
+               alpha = 0.7) +  
+  facet_wrap(vars(Format), strip.position = "bottom") + 
+  ggtitle(label= "Development of Knowledge") + 
+  scale_y_continuous(name = "Development of Knowledge") +
+  scale_fill_manual(values = c("slategray2", "lightpink1")) +
+  theme(axis.line = element_line(colour = "black")) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust= 0.5)) +
+  theme(legend.position = "none") + 
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+   
+print(developmentplot) 
+```
+
+```{r, fig.width=10,fig.height=11}
+# Combining descriptive plots 
+
+combinedplots <- (confusionplot | backlashplot)/(mistrustplot | confidenceplot)/(certaintyplot | developmentplot) 
+
+print(combinedplots)
+```
+
+

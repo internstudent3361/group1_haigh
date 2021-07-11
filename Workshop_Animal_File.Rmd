@@ -10,6 +10,35 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # load packages
+<<<<<<< HEAD
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(janitor)
+library(ggeasy)
+```
+
+# read data
+
+```{r message=FALSE, warning=FALSE}
+animal_rescues <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-06-29/animal_rescues.csv')
+
+```
+
+# clean data
+
+```{r}
+by_animal <- animal_rescues %>%
+  tabyl(animal_group_parent) 
+
+```
+
+
+```{r}
+by_animal <- by_animal %>%
+  select(-3) %>%
+  rename(animal = animal_group_parent, number_of_rescues = n)
+=======
 Use janitor for cleaning - cleans name to remove spaces and replace with _, make all lowercase.
 Use ggeasy to allow easy formatting of the plots. 
 ```{r message=FALSE, warning=FALSE}
@@ -38,10 +67,19 @@ Use rename for renaming variables - in the format 'new name = old name'
 by_animal <- by_animal %>%
   select(-3) %>% #remove third column '%' 
   rename(animal = animal_group_parent, number_of_rescues = n) #renaming variables - 'new name = old name'
+>>>>>>> 74850d7ded8d0fadb716137c436e832043d12aa1
 
 ```
 
 ```{r}
+<<<<<<< HEAD
+top5 <- by_animal %>%
+  arrange(-number_of_rescues) %>%
+  slice(1:5)
+```
+
+# visualise data
+=======
 top5 <- by_animal %>% #create new data 'top5' from 'by_animal'
   arrange(-number_of_rescues) %>% #arrange number of rescues in descending order (highest to lowest)
   slice(1:5) #select rows 1 to 5
@@ -49,6 +87,7 @@ top5 <- by_animal %>% #create new data 'top5' from 'by_animal'
 
 # visualise data
 Plot using 'top 5' data using function ggplot. Aesthetic argument is used to choose the variables for x- and y-axes. The x-axis is type of animal, y-axis total number of rescues. Use geom_col to plot it as a column graph.
+>>>>>>> 74850d7ded8d0fadb716137c436e832043d12aa1
 
 ```{r}
 top5 %>%
@@ -57,8 +96,11 @@ top5 %>%
   
 ```
 
+<<<<<<< HEAD
+=======
 Plot using 'top 5' data using function ggplot. Reordering graph above in descending order of number of rescues. Use coord_flip function so that instead of vertical, we view it as horizontal.
 
+>>>>>>> 74850d7ded8d0fadb716137c436e832043d12aa1
 ```{r}
 top5 %>%
   ggplot(aes(x = reorder(animal, number_of_rescues), y = number_of_rescues, fill = animal)) +
@@ -66,8 +108,11 @@ top5 %>%
   coord_flip()
 ```
 
+<<<<<<< HEAD
+=======
 Formatting - cleaning us the axes titles. Labs function used to change title of axes.
 Remove legend using. 
+>>>>>>> 74850d7ded8d0fadb716137c436e832043d12aa1
 ```{r}
 top5 %>%
   ggplot(aes(x = reorder(animal, number_of_rescues), y = number_of_rescues, fill = animal)) +
