@@ -321,7 +321,27 @@ certainty_plot <- ggplot(Exp_2_data, aes(x= Conflict, y = certainty, fill = Conf
 
 print(certainty_plot)
 ```
-
+```{r}
+development_violinplot <- ggplot(Exp_2_data, aes(x = Conflict, y = development, fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position = "bottom")+
+  stat_summary(
+    mapping = NULL,
+    data = NULL,
+    geom = "crossbar",
+    fun.data = "mean_ci",
+    fill = "white",
+    alpha = .7)+
+  geom_beeswarm(cex = 0.2)+ 
+  ggtitle(label = "Development of Knowledge")+
+  scale_y_continuous(
+    name = "Development of Knowledge", limits = c(1,5))+
+  scale_x_discrete(name = NULL)+
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(legend.position = 'none') + 
+  scale_fill_manual(values=c("slategray2", "lightpink1"))
+print(development_violinplot)
+```
 
 ## Development of Knowledge Plot 
 
@@ -350,7 +370,37 @@ combine_plots <- nutritional_confusion_plot + nutritional_backlash_plot + mistru
 print(combine_plots)
 ```
 
+```{r, fig.width = 10, fig.height= 10, warning=FALSE}
+#Make our own function
+figure.2.fun <- function(y_var, plot_title, y_title, lim_2 = 5) {
 
+ggplot(Exp_2_data, aes(x= Conflict, y = y_var, fill = Conflict)) +
+  geom_violin() + 
+  facet_wrap(vars(Format), strip.position= "bottom") + 
+  ggtitle(label= plot_title) + 
+  scale_y_continuous(name= y_title, limits= c(1,lim_2)) +
+  theme_minimal() +
+  geom_beeswarm(cex = 0.2) +
+  geom_crossbar(stat="summary", fun.y= "mean_ci", fill = "white", alpha = 0.7, width = 0.6)  +
+  scale_fill_manual(values=c("slategray2", "lightpink1"))+
+  theme(plot.title = element_text(hjust= 0.5)) +
+  easy_center_title() +
+  easy_remove_legend() +
+  easy_remove_x_axis(what = c("title"))
+}  
 
+#Use function to make plots
+confusion.plot <- figure.2.fun(y_var = Exp_2_data$confusion, plot_title = "Nutitional Confusion", y_title = "Nutitional Confusion")
+backlash.plot <- figure.2.fun(y_var = Exp_2_data$backlash, plot_title = "Nutitional Backlash", y_title = "Nutitional Backlash")
+mistrust.plot <- figure.2.fun(y_var = Exp_2_data$mistrust, plot_title = "Mistrust of Expertise", y_title = "Mistrust of Expertise")
+confidence.plot <- figure.2.fun(y_var = Exp_2_data$confidence, plot_title = "Confidence in Scientific Community", y_title = "Confidence in Scientific Community", lim_2 = 3)
+certainty.plot <- figure.2.fun(y_var = Exp_2_data$certainty, plot_title = "Certainty of Knowledge", y_title = "Certainty of Knowledge")
+development.plot <- figure.2.fun(y_var = Exp_2_data$development, plot_title = "Development of Knowledge", y_title = "Development of Knowledge")
+
+# Combine plots
+combine_plots <- confusion.plot + backlash.plot + mistrust.plot + confidence.plot + certainty.plot + development.plot + plot_layout(ncol = 2)
+
+print(combine_plots)
+```
 
 
