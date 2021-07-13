@@ -107,7 +107,7 @@ exponefinaldata %>%
 ## Descriptive stats for each variable measured in Experiment 1 (Figure 1)
 ```{r}
 #Contradiction Plot
-# Change from Chr to Numberic for all contradiction variables
+# Change from Chr to Numeric for all contradiction variables
 exponefinaldata$contradiction_1 <- as.numeric(exponefinaldata$contradiction_1)
 exponefinaldata$contradiction_2 <- as.numeric(exponefinaldata$contradiction_2)
 exponefinaldata$contradiction_3 <- as.numeric(exponefinaldata$contradiction_3)
@@ -149,6 +149,12 @@ levels(exponefinaldata$conflict)[levels(exponefinaldata$conflict)=="Conflict"] <
 levels(exponefinaldata$conflict)[levels(exponefinaldata$conflict)=="Consistent"] <- "Non-Conf."
 ```
 
+#Sam changing advancement and confusion variable types 
+```{r}
+# Changing advancement and confusion from character into numeric 
+exponefinaldata$confusion <- as.numeric(exponefinaldata$confusion)
+exponefinaldata$advancement <- as.numeric(exponefinaldata$advancement)
+```
 
 ```{r}
 #Plot Contradiction
@@ -293,6 +299,37 @@ combinedplot1 <- contradiction + advancement + confusion + plot_layout(ncol = 2)
 
 plot (combinedplot1)
 ```
+
+# Sam using function to combine Exp1's plots 
+```{r}
+#Making our function 
+figure.1.fun <- function(y_var, plot_title, y_title, lim_1, lim_2)  {
+  
+  ggplot(exponefinaldata,aes(x = conflict, y = y_var, fill = conflict)) +
+  geom_violin() +
+  ggtitle(label = plot_title) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_x_discrete(name = NULL) +
+  scale_y_continuous(name = y_title, limits = c(lim_1, lim_2)) +
+  facet_wrap(vars(format), strip.position = "bottom") +
+  stat_summary(fun.data = "mean_cl_normal", geom = "crossbar", fill = "white", alpha = .7) +
+  easy_remove_legend() +
+  geom_beeswarm(cex = 0.2) + 
+  scale_fill_manual(values = c("slategray2", "lightpink1"))
+             
+}
+
+#Plotting Contradiction, Advancement and Confusion plots using function 
+contradiction.plot <- figure.1.fun(y_var = exponefinaldata$contradiction, plot_title = "Contradiction", y_title = "Perceived Contradiction", lim_1 = 1, lim_2= 30) 
+advancement.plot <- figure.1.fun(y_var = exponefinaldata$advancement, plot_title = "Advancement", y_title = "Perceived Scientific Advancement", lim_1 = -1, lim_2 = 1)
+confusion.plot <- figure.1.fun(y_var = exponefinaldata$confusion, plot_title = "Confusion", y_title = "Confusion", lim_1 = 1, lim_2 = 5)
+
+#Combining plots 
+combineplots1 <- contradiction.plot + advancement.plot + confusion.plot + plot_layout(ncol = 2)
+
+print(combineplots1)
+```
+
 
 #Next: Histogram displaying number of participants in each condition who felt the body of research reported in the headlines resulted in us knowing more than before, less than before, or the same as before
 
@@ -770,7 +807,7 @@ plot (combinedplot2)
 ## Torunn adding new function to write plots in a tidier way 
 ```{r, fig.width = 10, fig.height= 10, warning=FALSE}
 #Make our own function
-figure.3.fun <- function(y_var, plot_title, y_title, lim_2 = 5) {
+figure.2.fun <- function(y_var, plot_title, y_title, lim_2 = 5) {
 
 ggplot(exptwofinaldata, aes(x= conflict, y = y_var, fill = conflict)) +
     geom_violin() +
@@ -787,8 +824,8 @@ ggplot(exptwofinaldata, aes(x= conflict, y = y_var, fill = conflict)) +
 }  
 
 #Use function to make plots
-confusion.plot <- figure.2.fun(y_var = exptwofinaldata$confusion, plot_title = "Nutitional Confusion", y_title = "Nutitional Confusion")
-backlash.plot <- figure.2.fun(y_var = exptwofinaldata$backlash, plot_title = "Nutitional Backlash", y_title = "Nutitional Backlash")
+confusion.plot <- figure.2.fun(y_var = exptwofinaldata$confusion, plot_title = "Nutritional Confusion", y_title = "Nutritional Confusion")
+backlash.plot <- figure.2.fun(y_var = exptwofinaldata$backlash, plot_title = "Nutritional Backlash", y_title = "Nutritional Backlash")
 mistrust.plot <- figure.2.fun(y_var = exptwofinaldata$mistrust, plot_title = "Mistrust of Expertise", y_title = "Mistrust of Expertise")
 confidence.plot <- figure.2.fun(y_var = exptwofinaldata$confidence, plot_title = "Confidence in Scientific Community", y_title = "Confidence in Scientific Community", lim_2 = 3)
 certainty.plot <- figure.2.fun(y_var = exptwofinaldata$certainty, plot_title = "Certainty of Knowledge", y_title = "Certainty of Knowledge")
