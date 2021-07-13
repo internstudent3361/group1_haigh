@@ -767,3 +767,35 @@ combinedplot2 <- confusion + backlash + mistrust + confidence + certainty + deve
 plot (combinedplot2)
 ```
 
+## Torunn adding new function to write plots in a tidier way 
+```{r, fig.width = 10, fig.height= 10, warning=FALSE}
+#Make our own function
+figure.3.fun <- function(y_var, plot_title, y_title, lim_2 = 5) {
+
+ggplot(exptwofinaldata, aes(x= conflict, y = y_var, fill = conflict)) +
+    geom_violin() +
+    facet_wrap(vars(format), strip.position = "bottom") +
+  stat_summary(fun.data = "mean_cl_normal",geom = "crossbar", fill = "white", alpha = .7) +
+  geom_beeswarm(cex = 0.2) +
+  ggtitle(label = plot_title) +
+  theme_bw() +
+  easy_center_title() +
+  easy_remove_legend() +
+  easy_remove_x_axis(what = c("title")) +
+  scale_y_continuous(name = y_title, limits= c(1,lim_2)) +
+  scale_fill_manual(values = c("slategray2", "lightpink1")) 
+}  
+
+#Use function to make plots
+confusion.plot <- figure.2.fun(y_var = exptwofinaldata$confusion, plot_title = "Nutitional Confusion", y_title = "Nutitional Confusion")
+backlash.plot <- figure.2.fun(y_var = exptwofinaldata$backlash, plot_title = "Nutitional Backlash", y_title = "Nutitional Backlash")
+mistrust.plot <- figure.2.fun(y_var = exptwofinaldata$mistrust, plot_title = "Mistrust of Expertise", y_title = "Mistrust of Expertise")
+confidence.plot <- figure.2.fun(y_var = exptwofinaldata$confidence, plot_title = "Confidence in Scientific Community", y_title = "Confidence in Scientific Community", lim_2 = 3)
+certainty.plot <- figure.2.fun(y_var = exptwofinaldata$certainty, plot_title = "Certainty of Knowledge", y_title = "Certainty of Knowledge")
+development.plot <- figure.2.fun(y_var = exptwofinaldata$development, plot_title = "Development of Knowledge", y_title = "Development of Knowledge")
+
+# Combine plots
+combine_plots <- confusion.plot + backlash.plot + mistrust.plot + confidence.plot + certainty.plot + development.plot + plot_layout(ncol = 2)
+
+print(combine_plots)
+```
