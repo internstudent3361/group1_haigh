@@ -14,24 +14,22 @@ output:
 ```{r}
 
 #Loading relevant packages
-library(tidyverse)
-library(dplyr)
 library(qualtRics)
-library(tidyr)
-library(ggpubr)
-library(ggplot2)
-library(patchwork)
+library(tidyverse) #for dplyr and ggplot
 library(ggbeeswarm)
+library(ggeasy)
+library(patchwork)
 
 #Reading the data from my working directory using the qualtRics 'read_survey' function - Notably, this function removes the text in rows 2 and 3 (not part of the data)
 #This function also sets all relevant columns to 'numeric' rather than 'character', which allows us to do descriptive calculations, mutate new variables, and plot data
 mydata=read_survey("Study_1_data.csv")
 
-# Checking the types of variable we have (e.g., numeric, string, character etc.) **Note that relevant columns for calulations are 'numeric'
-sapply(mydata, class)
-
 # CONVERT mydata to a data.frame - the qualtRics package Formats the data to a tibble rather than a data frame - converting mydata into a data.frame fixes the rounding issue in my numeric calculations 
 mydata<- as.data.frame(mydata)
+
+# Checking the types of variable we have (e.g., numeric, string, character etc.) **Note that relevant columns for calculations are 'numeric'
+sapply(mydata, class) %>% as.data.frame.list()
+
 ```
 
 ## 1. Filtering Data (Exp 1) 
@@ -39,10 +37,6 @@ mydata<- as.data.frame(mydata)
 
 #Count how many times the survey was opened i.e. the number of observations (anyone with progress >= 1%)   [371] 
 mydata %>% count(Progress>=1) #371
-
-#Count how many particpants CONSENTED to take part (this is BEFORE any exclusions for non-completion / non-serious responding) [363]
-#371 rows in data frame, but only 363 clicked the consent button 
-mydata %>% count(Consent==1) #363
 
 #Renaming variables "SC0" to "recall_score" and "FL_10_DO" to "condition"
 mydata <- mydata %>% rename(Recall_score = SC0, Condition = FL_10_DO)
@@ -59,6 +53,7 @@ mydata %>% count(Progress>=1) #Ensure that the no. of observations are now 312 (
 
 mydata <- mydata %>% 
     filter(
+      Consent == 1,
       Finished == 1,
       Serious_check == 1,
       Recall_score >= 4) %>% 
@@ -95,8 +90,7 @@ mydata %>% count(Gender) #male = 126, female = 168, other = 0, prefer not = 0
 ```{r}
 ##For contradiction plot, must create a NEW variable: sum of the six contradiction ratings
 mydata <- mydata %>%
-  rowwise() %>%
-  mutate(contradiction = sum(contradiction_1, contradiction_2, contradiction_3, contradiction_4, contradiction_5, contradiction_6))
+  mutate(contradiction = contradiction_1 + contradiction_2 + contradiction_3 + contradiction_4 + contradiction_5 + contradiction_6)
 
 ##For all plots
 #Separate the data in Condition into 4 columns to separate levels of each IV  ("Block_1_Generic_Conflict", "Block_2_Generic_Consistent", "Block_3_Qualified_Conflict" and "Block_4_Qualified_Consistent")
@@ -109,75 +103,42 @@ mydata <- mydata %>%
 
 sapply(mydata, class) #to check
 
+#Rename from Conflict/Consistent to Conf./Non-Conf.
+
 #Export the FINAL data to a .csv
-write_csv(mydata, "MyDataTidiedSubset.csv")
+write_csv(mydata, "MyDataFinalSubset.csv")
 
 ##Violin ggplots
 
-#Contradiction plot
-contradiction_violinplot <- ggplot(mydata, aes(x = Conflict, y = contradiction, fill = Conflict)) + #fill = colour grouping based on Conflict type
-  geom_violin() +   #creating violin plot
-  facet_wrap(vars(Format), strip.position = "bottom")+  #dividing plots by format, and changing facet titles to be at the bottom rather than top
-  stat_summary(      #adding crossbars to indicate mean of contradiction scores as well as 95% confidence intervals
-    mapping = NULL,
-    data = NULL,
-    geom = "crossbar",
-    fun.data = "mean_ci",   #adding 95% confidence intervals
-    fill = "white",         #changing colour
-    alpha = .7)+            #changing transparency of fill
-  geom_beeswarm(cex = 0.2)+             #adding dotpoints to violin plot. cex = scaling for adjusting point spacing
-  ggtitle(label = "Contradiction")+     #adding title
-  scale_y_continuous(        
-    name = "Perceived Contradiction",   #adding y-axis title
-    limits = c(0,30))+                 #setting scale from 0 to 30
-  scale_x_discrete(name = NULL)+        #removing x-axis title
-  theme(plot.title = element_text(hjust = 0.5)) +   #centering the title
-  theme(legend.position = 'none') +    #removing legend
-  scale_fill_manual(values=c("slategray2", "lightpink1")) #manually changing the fill colours from default colour grouping based on conflict to our desired colours
-print(contradiction_violinplot)
-
-#Advancement plot
-advancement_violinplot <- ggplot(mydata, aes(x = Conflict, y = advancement, fill = Conflict)) +
-  geom_violin() + 
-  facet_wrap(vars(Format), strip.position = "bottom")+
-  stat_summary(
-    mapping = NULL,
-    data = NULL,
-    geom = "crossbar",
-    fun.data = "mean_ci",
-    fill = "white",
-    alpha = .7)+
-  geom_beeswarm(cex = 0.2)+
-  ggtitle(label = "Advancement")+
-  scale_y_continuous(name = "Perceived Scientific Advancement")+
-  scale_x_discrete(name = NULL)+
-  theme(plot.title = element_text(hjust = 0.5)) + 
-  theme(legend.position = 'none') +
-  scale_fill_manual(values=c("slategray2", "lightpink1"))
-print(advancement_violinplot)
-
-#Confusion plot
-confusion_violinplot <- ggplot(mydata, aes(x = Conflict, y = confusion, fill = Conflict)) +
-  geom_violin() + 
-  facet_wrap(vars(Format), strip.position = "bottom")+
-  stat_summary(
-    mapping = NULL,
-    data = NULL,
-    geom = "crossbar",
-    fun.data = "mean_ci",
-    fill = "white",
-    alpha = .7)+
-  geom_beeswarm(cex = 0.2)+
-  ggtitle(label = "Confusion") +
-  scale_y_continuous(name = "Perceived Confusion") +
+#Making our own function 
+figure.1.fun <- function(y_var, plot_title, y_title, lim_1, lim_2)  {
+  ggplot(mydata,aes(x = Conflict, y = y_var, fill = Conflict)) +
+  geom_violin() +
+  facet_wrap(vars(Format), strip.position = "bottom") +
+  stat_summary(fun.data = "mean_cl_normal", geom = "crossbar", fill = "white",
+    alpha = .7) +
+  geom_beeswarm(cex = 0.2) + 
+  ggtitle(label = plot_title) +
+  easy_center_title() +
+  easy_remove_legend() +
   scale_x_discrete(name = NULL) +
-  theme(plot.title = element_text(hjust = 0.5)) + 
-  theme(legend.position = 'none') +
-  scale_fill_manual(values=c("slategray2", "lightpink1"))
-print(confusion_violinplot)
+  scale_y_continuous(name = y_title, limits = c(lim_1, lim_2)) +
+  scale_fill_manual(values = c("slategray2", "lightpink1")) }
 
+#Plotting Contradiction, Advancement and Confusion plots using function 
+contradiction.plot <- figure.1.fun(y_var = mydata$contradiction, plot_title = "Contradiction", y_title = "Perceived Contradiction", lim_1 = 1, lim_2= 30) 
+advancement.plot <- figure.1.fun(y_var = mydata$advancement, plot_title = "Advancement", y_title = "Perceived Scientific Advancement", lim_1 = -1, lim_2 = 1)
+confusion.plot <- figure.1.fun(y_var = mydata$confusion, plot_title = "Confusion", y_title = "Confusion", lim_1 = 1, lim_2 = 5)
+
+print(contradiction.plot)
+print(advancement.plot)
+print(confusion.plot)
+
+```
+
+```{r, fig.width=10, fig.height=11}
 # Combine plots using the package patchwork()
-combinedplots1 <- contradiction_violinplot + advancement_violinplot + confusion_violinplot + plot_layout(ncol = 2)
+combinedplots1 <- contradiction.plot + advancement.plot + confusion.plot + plot_layout(ncol = 2)
 print(combinedplots1)
 
 ```
@@ -241,11 +202,11 @@ print(advancement_histogram)
 #This function also sets all relevant columns to 'numeric' rather than 'character', which allows us to do descriptive calculations, mutate new variables, and plot data
 mydata2=read_survey("Study_2_data.csv")
 
-# Checking the types of variable we have (e.g., numeric, string, character etc.) **Note that relevant columns for calculations are 'numeric'
-sapply(mydata2, class)
-
 # CONVERT mydata to a data.frame - the qualtRics package Formats the data to a tibble rather than a data frame - converting mydata into a data.frame fixes the rounding issue in my numeric calculations 
 mydata2<- as.data.frame(mydata2)
+
+# Checking the types of variable we have (e.g., numeric, string, character etc.) **Note that relevant columns for calculations are 'numeric'
+sapply(mydata2, class) %>% as.data.frame.list()
 
 ```
 
@@ -254,9 +215,6 @@ mydata2<- as.data.frame(mydata2)
 ```{r}
 #Count how many times the survey was opened i.e. the number of observations (anyone with progress >= 1%) [412] 
 mydata2 %>% count(Progress>=1) #412
-
-#Count how many particpants CONSENTED to take part (this is BEFORE any exclusions for non-completion / non-serious responding) [412]
-mydata2 %>% count(Consent==1) #412 (ALL were consenting)
 
 #Renaming variables "SC0" to "Recall_score" and "FL_10_DO" to "Condition"
 mydata2 <- mydata2 %>% rename(Recall_score = SC0, Condition = FL_12_DO)
@@ -267,6 +225,7 @@ mydata2 <- mydata2 %>% rename(Recall_score = SC0, Condition = FL_12_DO)
 
 mydata2 <- mydata2 %>% 
   filter(
+    Consent == 1,
     Finished == 1,
     Serious_check == 1,
     Recall_score >= 4) %>% 
@@ -313,168 +272,76 @@ mydata2 <- mydata2 %>%
 
 sapply(mydata2, class) #to check
 
-#calculate the average for each scale -- library("dplyr")
+#calculate the average for each scale -- dplyr
 #nutritional confusion mean
 mydata2 <- mydata2 %>%
-  rowwise() %>%
   mutate(confusion = (NC_1 + NC_2 + NC_3 + NC_4 + NC_5 + NC_6)/6)
 
 #nutritional backlash mean
 mydata2 <- mydata2 %>%
-  rowwise() %>%
   mutate(backlash = (NBS_1 + NBS_2 + NBS_3 + NBS_4 + NBS_5 + NBS_6)/6)
 
 #Mistrust of expertise mean
 mydata2 <- mydata2 %>%
-  rowwise() %>%
-  mutate(mistrust = (Mistrust_expertise_1 + Mistrust_expertise_2 + Mistrust_expertise_3)/3)
+  mutate(mistrust = (Mistrust_expertise_1 + Mistrust_expertise_2 +
+    Mistrust_expertise_3)/3)
 
 #Confidence in scientific community = single column ('GSS')
 
 #Certainty of knowledge mean
 mydata2 <- mydata2 %>%
-  rowwise() %>%
-  mutate(certainty = (Certainty_sci_know_1 + Certainty_sci_know_2 + Certainty_sci_know_3 + Certainty_sci_know_4 + Certainty_sci_know_5 + Certainty_sci_know_6)/6)
+  mutate(certainty = (Certainty_sci_know_1 + Certainty_sci_know_2 +
+    Certainty_sci_know_3 + Certainty_sci_know_4 + Certainty_sci_know_5 + 
+    Certainty_sci_know_6)/6)
 
 #Development of knowledge mean
 mydata2 <- mydata2 %>%
-  rowwise() %>%
-  mutate(development = (Development_sci_know_1 + Development_sci_know_2 + Development_sci_know_3 + Development_sci_know_4 + Development_sci_know_5 + Development_sci_know_6)/6)
+  mutate(development = (Development_sci_know_1 + Development_sci_know_2 +
+    Development_sci_know_3 + Development_sci_know_4 + Development_sci_know_5 +
+    Development_sci_know_6)/6)
 
 #Export the FINAL data to a .csv
 write_csv(mydata2, "MyDataFinalSubset2.csv")
 
 ##Violin ggplots
 
-#Nutritional Confusion plot
-nutritionalconfusion_violinplot <- ggplot(mydata2, aes(x = Conflict, y = confusion, fill = Conflict)) +      #fill = colour grouping based on Conflict type
-  geom_violin() + #creating violin plot
-  facet_wrap(vars(Format), strip.position = "bottom")+  #dividing plots by format, and changing facet titles to be at the bottom rather than top
-  stat_summary(   #adding crossbars to indicate mean of contradiction scores as well as 95% confidence intervals
-    mapping = NULL,
-    data = NULL,
-    geom = "crossbar",
-    fun.data = "mean_ci",   #adding 95% confidence intervals
-    fill = "white",         #changing colour
-    alpha = .7)+            #changing transparency of fill
-  geom_beeswarm(cex = 0.2)+     #adding dotpoints to violin plot. cex = scaling for adjusting point spacing
-  ggtitle(label = "Nutritional Confusion")+    #adding title
-  scale_y_continuous(                          #adding y-axis title
-    name = "Nutritional Confusion")+        
-  scale_x_discrete(name = NULL)+               #removing x-axis title
-  theme(plot.title = element_text(hjust = 0.5)) +    #centering the title
-  theme(legend.position = 'none') +                  #removing legend
-  scale_fill_manual(values=c("slategray2", "lightpink1"))    #manually changing the fill colours from default colour grouping based on conflict to our desired colours
-print(nutritionalconfusion_violinplot)
+#Make our own function
+figure.2.fun <- function(y_var, plot_title, y_title, lim_2 = 5) {
+  ggplot(mydata2, aes(x= Conflict, y = y_var, fill = Conflict)) +
+  geom_violin() +
+  facet_wrap(vars(Format), strip.position = "bottom") +
+  stat_summary(fun.data = "mean_cl_normal",geom = "crossbar", fill = "white",
+    alpha = .7) +
+  geom_beeswarm(cex = 0.2) +
+  ggtitle(label = plot_title) +
+  easy_center_title() +
+  easy_remove_legend() +
+  scale_x_discrete(name = NULL) +
+  scale_y_continuous(name = y_title, limits= c(1,lim_2)) +
+  scale_fill_manual(values = c("slategray2", "lightpink1")) } 
 
-#Nutritional Backlash plot
-nutritionalbacklash_violinplot <- ggplot(mydata2, aes(x = Conflict, y = backlash, fill = Conflict)) +
-  geom_violin() + 
-  facet_wrap(vars(Format), strip.position = "bottom")+
-  stat_summary(
-    mapping = NULL,
-    data = NULL,
-    geom = "crossbar",
-    fun.data = "mean_ci",
-    fill = "white",
-    alpha = .7)+
-  geom_beeswarm(cex = 0.2)+
-  ggtitle(label = "Nutritional Backlash")+
-  scale_y_continuous(
-    name = "Nutritional Backlash")+
-  scale_x_discrete(name = NULL)+
-  theme(plot.title = element_text(hjust = 0.5)) + 
-  theme(legend.position = 'none') + 
-  scale_fill_manual(values=c("slategray2", "lightpink1"))
-print(nutritionalbacklash_violinplot)
+#Use function to make plots
+nutritionalconfusion.plot <- figure.2.fun(y_var = mydata2$confusion, plot_title = "Nutritional Confusion", y_title = "Nutritional Confusion")
+nutritionalbacklash.plot <- figure.2.fun(y_var = mydata2$backlash, plot_title = "Nutritional Backlash", y_title = "Nutritional Backlash")
+mistrust.plot <- figure.2.fun(y_var = mydata2$mistrust, plot_title = "Mistrust of Expertise", y_title = "Mistrust of Expertise")
+confidence.plot <- figure.2.fun(y_var = mydata2$GSS, plot_title = "Confidence in Scientific Community", y_title = "Confidence in Scientific Community", lim_2 = 3)
+certainty.plot <- figure.2.fun(y_var = mydata2$certainty, plot_title = "Certainty of Knowledge", y_title = "Certainty of Knowledge")
+development.plot <- figure.2.fun(y_var = mydata2$development, plot_title = "Development of Knowledge", y_title = "Development of Knowledge")
 
-#Mistrust of Expertise plot
-mistrust_violinplot <- ggplot(mydata2, aes(x = Conflict, y = mistrust, fill = Conflict)) +
-  geom_violin() + 
-  facet_wrap(vars(Format), strip.position = "bottom")+
-  stat_summary(
-    mapping = NULL,
-    data = NULL,
-    geom = "crossbar",
-    fun.data = "mean_ci",
-    fill = "white",
-    alpha = .7)+
-  geom_beeswarm(cex = 0.2)+ 
-  ggtitle(label = "Mistrust of Expertise")+
-  scale_y_continuous(
-    name = "Mistrust of Expertise")+
-  scale_x_discrete(name = NULL)+
-  theme(plot.title = element_text(hjust = 0.5)) + 
-  theme(legend.position = 'none') + 
-  scale_fill_manual(values=c("slategray2", "lightpink1"))
-print(mistrust_violinplot)
+print(nutritionalconfusion.plot)
+print(nutritionalbacklash.plot)
+print(mistrust.plot)
+print(confidence.plot)
+print(certainty.plot)
+print(development.plot)
 
-#Confidence in Scientific Community plot
-confidence_violinplot <- ggplot(mydata2, aes(x = Conflict, y = GSS, fill = Conflict)) +
-  geom_violin() + 
-  facet_wrap(vars(Format), strip.position = "bottom")+
-  stat_summary(
-    mapping = NULL,
-    data = NULL,
-    geom = "crossbar",
-    fun.data = "mean_ci",
-    fill = "white",
-    alpha = .7)+
-  geom_beeswarm(cex = 0.2)+ 
-  ggtitle(label = "Confidence in Scientific Community")+
-  scale_y_continuous(
-    name = "Confidence in Scientific Community")+
-  scale_x_discrete(name = NULL)+
-  theme(plot.title = element_text(hjust = 0.5)) + 
-  theme(legend.position = 'none') + 
-  scale_fill_manual(values=c("slategray2", "lightpink1"))
-print(confidence_violinplot)
+```
 
-#Certainty of Knowledge plot
-certainty_violinplot <- ggplot(mydata2, aes(x = Conflict, y = certainty, fill = Conflict)) +
-  geom_violin() + 
-  facet_wrap(vars(Format), strip.position = "bottom")+
-  stat_summary(
-    mapping = NULL,
-    data = NULL,
-    geom = "crossbar",
-    fun.data = "mean_ci",
-    fill = "white",
-    alpha = .7)+
-  geom_beeswarm(cex = 0.2)+ 
-  ggtitle(label = "Certainty of Knowledge")+
-  scale_y_continuous(
-    name = "Certainty of Knowledge")+
-  scale_x_discrete(name = NULL)+
-  theme(plot.title = element_text(hjust = 0.5)) + 
-  theme(legend.position = 'none') + 
-  scale_fill_manual(values=c("slategray2", "lightpink1"))
-print(certainty_violinplot)
-
-#Development of Knowledge plot
-development_violinplot <- ggplot(mydata2, aes(x = Conflict, y = development, fill = Conflict)) +
-  geom_violin() + 
-  facet_wrap(vars(Format), strip.position = "bottom")+
-  stat_summary(
-    mapping = NULL,
-    data = NULL,
-    geom = "crossbar",
-    fun.data = "mean_ci",
-    fill = "white",
-    alpha = .7)+
-  geom_beeswarm(cex = 0.2)+ 
-  ggtitle(label = "Development of Knowledge")+
-  scale_y_continuous(
-    name = "Development of Knowledge", limits = c(1,5))+
-  scale_x_discrete(name = NULL)+
-  theme(plot.title = element_text(hjust = 0.5)) + 
-  theme(legend.position = 'none') + 
-  scale_fill_manual(values=c("slategray2", "lightpink1"))
-print(development_violinplot)
-
+```{r, fig.width=10, fig.height=11}
 # Combine plots using the package patchwork()
-combinedplots2 <- nutritionalconfusion_violinplot + nutritionalbacklash_violinplot + mistrust_violinplot + confidence_violinplot + certainty_violinplot + development_violinplot + plot_layout(ncol = 2)
+combinedplots2 <- nutritionalconfusion.plot + nutritionalbacklash.plot + mistrust.plot + confidence.plot + certainty.plot + development.plot + plot_layout(ncol = 2)
 print(combinedplots2)
+```
 
 ```
 
