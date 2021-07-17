@@ -462,6 +462,10 @@ exptwofinaldata <- exptwofinaldata %>%
   mutate(
     across(c(format:conflict), as.factor)
          )
+
+#Rename from Conflict/Consistent to Conf./Non-Conf.
+levels(exptwofinaldata$conflict)[levels(exptwofinaldata$conflict)=="Conflict"] <- "Conf."
+levels(exptwofinaldata$conflict)[levels(exptwofinaldata$conflict)=="Consistent"] <- "Non-Conf."
 ```
 
 4. Since there were multiple questions asked for each variable, we need to calculate the participants' average scores for each variable. First, we will need to change all the corresponding data to numeric from character.
