@@ -485,8 +485,19 @@ exptwofinaldata %>%
 ```{r}
 exptwofinaldata <- separate(data = exptwofinaldata, col = condition, into = c("block", "number", "format", "conflict"))
 
+<<<<<<< HEAD
 exptwofinaldata$format <- as.factor(exptwofinaldata$format)
 exptwofinaldata$conflict <- as.factor(exptwofinaldata$conflict)
+=======
+exptwofinaldata <- exptwofinaldata %>% 
+  mutate(
+    across(c(format:conflict), as.factor)
+         )
+
+#Rename from Conflict/Consistent to Conf./Non-Conf.
+levels(exptwofinaldata$conflict)[levels(exptwofinaldata$conflict)=="Conflict"] <- "Conf."
+levels(exptwofinaldata$conflict)[levels(exptwofinaldata$conflict)=="Consistent"] <- "Non-Conf."
+>>>>>>> a436035bf5e55bbfb5a372054ea68c5d79adf0b7
 ```
 
 4. Since there were multiple questions asked for each variable, we need to calculate the participants' average scores for each variable. First, we will need to change all the corresponding data to numeric from character.
