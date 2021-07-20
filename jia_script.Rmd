@@ -30,8 +30,11 @@ expone <- "Study 8 data.csv" %>%
   )
 
 exptwo <- "Study 7 data.csv" %>% 
-  read_csv()
-
+  read_csv() %>% 
+  rename(
+    recall_score = SC0, #nicer name for recall score
+    condition = FL_12_DO #nicer name for condition
+  )
 ```
 
 # Experiment 1
@@ -56,7 +59,7 @@ expone <- expone[!duplicated(expone$Prolific_PID), ]
 
 ```{r}
 # Apply pre-registered exclusion criteria - if they did not complete the task, declared they did not respond seriously, failed an attention check by recalling <4 headlines 
-exponefinal <- expone %>% 
+exponefinaldata <- expone %>% 
   filter(
     Consent == "1", #filter to include those who consented
     Finished == "1", #filter to include those who Finished
@@ -64,21 +67,30 @@ exponefinal <- expone %>%
     recall_score >= "4", #filter to include recalls core 4 and above only
     )
 
-exponefinaldata <- subset(
-  exponefinal, select = c (Finished, `Duration (in seconds)`, Gender, Age, Serious_check, recall_score, condition, contradiction_1:advancement)
-)
-
 # Count final participant n in Exp 1
 exponefinaldata %>% 
   count(Serious_check)
+
+exponefinaldata <- exponefinaldata %>% 
+  select(Finished, Gender, Age, Serious_check, recall_score, condition, contradiction_1:advancement)
+
+# Change variables from Chr to Numeric/Factor accordingly
+exponefinaldata <- exponefinaldata %>% 
+  mutate(
+    across(c(Age,contradiction_1:advancement), as.numeric),
+    across(c(Gender, condition), as.factor)
+         )
 ```
 
 First, use the mutate() to rename "1" to male and "2" to female under the Gender variable.
 Then, we use count() to count total n for male and female.
 ```{r}
-exponefinaldata <- mutate(
- exponefinaldata, 
- Gender = ifelse(exponefinaldata$Gender==1, "male", "female")
+exponefinaldata <- exponefinaldata %>% 
+  mutate(
+    Gender = case_when(
+    Gender == 1 ~ "Male",
+    Gender == 2 ~ "Female"
+    )
 )
 
 # Count males and females
@@ -92,8 +104,6 @@ First, we use as.numeric() to change the Age variable for Chr to Numeric.And the
 
 ```{r}
 # Other descriptive statistics
-exponefinaldata$Age <- as.numeric(exponefinal$Age) #change from Character to Numeric
-
 exponefinaldata %>% 
   summarise(
     Mean = mean(Age),
@@ -106,54 +116,27 @@ exponefinaldata %>%
 
 ## Descriptive stats for each variable measured in Experiment 1 (Figure 1)
 ```{r}
-#Contradiction Plot
-# Change from Chr to Numeric for all contradiction variables
-exponefinaldata$contradiction_1 <- as.numeric(exponefinaldata$contradiction_1)
-exponefinaldata$contradiction_2 <- as.numeric(exponefinaldata$contradiction_2)
-exponefinaldata$contradiction_3 <- as.numeric(exponefinaldata$contradiction_3)
-exponefinaldata$contradiction_4 <- as.numeric(exponefinaldata$contradiction_4)
-exponefinaldata$contradiction_5 <- as.numeric(exponefinaldata$contradiction_5)
-exponefinaldata$contradiction_6 <- as.numeric(exponefinaldata$contradiction_6)
-
-# Change from Chr to Factor to allow grouping in the plot
-exponefinaldata$condition <- as.factor(exponefinaldata$condition)
-
 #Sum contradiction variables into a new variable 'Contradiction'
 exponefinaldata <- exponefinaldata %>% 
   rowwise() %>% 
   mutate(
     contradiction = sum(contradiction_1, contradiction_2, contradiction_3, contradiction_4, contradiction_5, contradiction_6)
   )
-```
 
-```{r}
-#Replicate Condition column so that we can separate it into 4 variables
-exponefinaldata <- exponefinaldata %>%  
-  mutate(
-    condition2 = condition
-)
-```
-
-```{r}
 #Separate the data into 4 columns
-exponefinaldata <- separate(data = exponefinaldata, col = condition2, into = c("block", "number", "format", "conflict"))
+exponefinaldata <- separate(data = exponefinaldata, col = condition, into = c("block", "number", "format", "conflict"))
 
 #Convert format and conflict to Factors
-exponefinaldata$format <- as.factor(exponefinaldata$format)
-exponefinaldata$conflict <- as.factor(exponefinaldata$conflict)
+exponefinaldata <- exponefinaldata %>% 
+  mutate(
+    across(c(format:conflict), as.factor)
+         )
 ```
 
 ```{r}
 #Rename from Conflict/Consistent to Conf./Non-Conf.
 levels(exponefinaldata$conflict)[levels(exponefinaldata$conflict)=="Conflict"] <- "Conf."
 levels(exponefinaldata$conflict)[levels(exponefinaldata$conflict)=="Consistent"] <- "Non-Conf."
-```
-
-#Sam changing advancement and confusion variable types 
-```{r}
-# Changing advancement and confusion from character into numeric 
-exponefinaldata$confusion <- as.numeric(exponefinaldata$confusion)
-exponefinaldata$advancement <- as.numeric(exponefinaldata$advancement)
 ```
 
 ```{r}
@@ -301,23 +284,21 @@ plot (combinedplot1)
 ```
 
 # Sam using function to combine Exp1's plots 
-```{r, fig.width= 7, fig.height= 7, warning= FALSE}
+```{r, fig.width = 10, fig.height= 10, warning=FALSE}
 #Making our function 
 figure.1.fun <- function(y_var, plot_title, y_title, lim_1, lim_2)  {
   
   ggplot(exponefinaldata,aes(x = conflict, y = y_var, fill = conflict)) +
   geom_violin() +
   ggtitle(label = plot_title) +
-  theme_bw() +
-  theme(plot.title = element_text(hjust = 0.5, size = 8),
-        axis.title.y = element_text(size=6)) +
+  theme(plot.title = element_text(hjust = 0.5)) +
   scale_x_discrete(name = NULL) +
   scale_y_continuous(name = y_title, limits = c(lim_1, lim_2)) +
   facet_wrap(vars(format), strip.position = "bottom") +
   stat_summary(fun.data = "mean_cl_normal", geom = "crossbar", fill = "white", alpha = .7) +
   easy_remove_legend() +
   geom_beeswarm(cex = 0.2) + 
-  scale_fill_manual(values = c("slategray2", "lightpink1")) 
+  scale_fill_manual(values = c("slategray2", "lightpink1"))
              
 }
 
@@ -331,7 +312,6 @@ combineplots1 <- contradiction.plot + advancement.plot + confusion.plot + plot_l
 
 print(combineplots1)
 ```
-
 
 #Next: Histogram displaying number of participants in each condition who felt the body of research reported in the headlines resulted in us knowing more than before, less than before, or the same as before
 
@@ -383,19 +363,6 @@ plot(advancement_histogram)
 
 # Experiment 2
 
-Next, loading the data file for Experiment 2:
-- Creating it as an object in our environment named 'exptwo'.
-- Read the CSV 
-- Rename SC0 to recall_score; FL_10_D0 to condition using the rename()
-```{r}
-exptwo <- "Study 7 data.csv" %>% 
-  read_csv() %>% 
-  rename(
-    recall_score = SC0, #nicer name for recall score
-    condition = FL_12_DO #nicer name for condition
-  )
-```
-
 ## Tidying up the Data
 1. First, I'll remove the first 2 rows of the data file as it does not contain participants' data. I will use slice() for this purpose
 2. As the data file contains a lot of unneeded data (it has 360 columns!) for the purpose of verifying the descriptive statistics, I am going to tidy up the data by reducing the number of variables displayed. This will allow us to more easily work with it.
@@ -429,6 +396,13 @@ exptwofinaldata <- exptwo %>%
 
 exptwofinaldata %>% 
   count (Consent)
+
+# Change variables from Chr to Numeric/Factor accordingly
+exptwofinaldata <- exptwofinaldata %>% 
+  mutate(
+    across(c(Age:Development_sci_know_6), as.numeric),
+    across(c(Gender, condition), as.factor)
+         )
 ```
 
 ## Count Males/Females
@@ -463,8 +437,6 @@ exptwofinaldata %>%
 3. Hooray! This matches with our paper's report of Mean = 33.5, SD = 12 and Range = 18-73.
 
 ```{r}
-exptwofinaldata$Age <- as.numeric(exptwofinaldata$Age)
-
 exptwofinaldata %>% 
   summarise(
     Mean = mean(Age),
@@ -486,10 +458,6 @@ exptwofinaldata %>%
 ```{r}
 exptwofinaldata <- separate(data = exptwofinaldata, col = condition, into = c("block", "number", "format", "conflict"))
 
-<<<<<<< HEAD
-exptwofinaldata$format <- as.factor(exptwofinaldata$format)
-exptwofinaldata$conflict <- as.factor(exptwofinaldata$conflict)
-=======
 exptwofinaldata <- exptwofinaldata %>% 
   mutate(
     across(c(format:conflict), as.factor)
@@ -498,7 +466,6 @@ exptwofinaldata <- exptwofinaldata %>%
 #Rename from Conflict/Consistent to Conf./Non-Conf.
 levels(exptwofinaldata$conflict)[levels(exptwofinaldata$conflict)=="Conflict"] <- "Conf."
 levels(exptwofinaldata$conflict)[levels(exptwofinaldata$conflict)=="Consistent"] <- "Non-Conf."
->>>>>>> a436035bf5e55bbfb5a372054ea68c5d79adf0b7
 ```
 
 4. Since there were multiple questions asked for each variable, we need to calculate the participants' average scores for each variable. First, we will need to change all the corresponding data to numeric from character.
@@ -507,43 +474,14 @@ levels(exptwofinaldata$conflict)[levels(exptwofinaldata$conflict)=="Consistent"]
 
 ```{r}
 # Calculate participants' average scores as a new variable for each of the 6 variables studied
-exptwofinaldata$NC_1 <- as.numeric(exptwofinaldata$NC_1)
-exptwofinaldata$NC_2 <- as.numeric(exptwofinaldata$NC_2)
-exptwofinaldata$NC_3 <- as.numeric(exptwofinaldata$NC_3)
-exptwofinaldata$NC_4 <- as.numeric(exptwofinaldata$NC_4)
-exptwofinaldata$NC_5 <- as.numeric(exptwofinaldata$NC_5)
-exptwofinaldata$NC_6 <- as.numeric(exptwofinaldata$NC_6)
-exptwofinaldata$NBS_1 <- as.numeric(exptwofinaldata$NBS_1)
-exptwofinaldata$NBS_2 <- as.numeric(exptwofinaldata$NBS_2)
-exptwofinaldata$NBS_3 <- as.numeric(exptwofinaldata$NBS_3)
-exptwofinaldata$NBS_4 <- as.numeric(exptwofinaldata$NBS_4)
-exptwofinaldata$NBS_5 <- as.numeric(exptwofinaldata$NBS_5)
-exptwofinaldata$NBS_6 <- as.numeric(exptwofinaldata$NBS_6)
-exptwofinaldata$Mistrust_expertise_1 <- as.numeric(exptwofinaldata$Mistrust_expertise_1)
-exptwofinaldata$Mistrust_expertise_2 <- as.numeric(exptwofinaldata$Mistrust_expertise_2)
-exptwofinaldata$Mistrust_expertise_3 <- as.numeric(exptwofinaldata$Mistrust_expertise_3)
-exptwofinaldata$GSS <- as.numeric(exptwofinaldata$GSS)
-exptwofinaldata$Certainty_sci_know_1 <- as.numeric(exptwofinaldata$Certainty_sci_know_1)
-exptwofinaldata$Certainty_sci_know_2 <- as.numeric(exptwofinaldata$Certainty_sci_know_2)
-exptwofinaldata$Certainty_sci_know_3 <- as.numeric(exptwofinaldata$Certainty_sci_know_3)
-exptwofinaldata$Certainty_sci_know_4 <- as.numeric(exptwofinaldata$Certainty_sci_know_4)
-exptwofinaldata$Certainty_sci_know_5 <- as.numeric(exptwofinaldata$Certainty_sci_know_5)
-exptwofinaldata$Certainty_sci_know_6 <- as.numeric(exptwofinaldata$Certainty_sci_know_6)
-exptwofinaldata$Development_sci_know_1 <- as.numeric(exptwofinaldata$Development_sci_know_1)
-exptwofinaldata$Development_sci_know_2 <- as.numeric(exptwofinaldata$Development_sci_know_2)
-exptwofinaldata$Development_sci_know_3 <- as.numeric(exptwofinaldata$Development_sci_know_3)
-exptwofinaldata$Development_sci_know_4 <- as.numeric(exptwofinaldata$Development_sci_know_4)
-exptwofinaldata$Development_sci_know_5 <- as.numeric(exptwofinaldata$Development_sci_know_5)
-exptwofinaldata$Development_sci_know_6 <- as.numeric(exptwofinaldata$Development_sci_know_6)
-
 exptwofinaldata <- exptwofinaldata %>% 
   mutate (
-    confusion = ((exptwofinaldata$NC_1 + exptwofinaldata$NC_2 + exptwofinaldata$NC_3 + exptwofinaldata$NC_4 + exptwofinaldata$NC_5 + exptwofinaldata$NC_6)/6),
-    backlash = ((exptwofinaldata$NBS_1 + exptwofinaldata$NBS_2 + exptwofinaldata$NBS_3 + exptwofinaldata$NBS_4 + exptwofinaldata$NBS_5 + exptwofinaldata$NBS_6)/6),
-    mistrust = ((exptwofinaldata$Mistrust_expertise_1 + exptwofinaldata$Mistrust_expertise_2 + exptwofinaldata$Mistrust_expertise_3)/3),
+    confusion = ((NC_1 + NC_2 + NC_3 + NC_4 + NC_5 + NC_6)/6),
+    backlash = ((NBS_1 + NBS_2 + NBS_3 + NBS_4 + NBS_5 + NBS_6)/6),
+    mistrust = ((Mistrust_expertise_1 + Mistrust_expertise_2 + Mistrust_expertise_3)/3),
     confidence = exptwofinaldata$GSS,
-    certainty = ((exptwofinaldata$Certainty_sci_know_1 + exptwofinaldata$Certainty_sci_know_2 + exptwofinaldata$Certainty_sci_know_3 + exptwofinaldata$Certainty_sci_know_4 + exptwofinaldata$Certainty_sci_know_5 + exptwofinaldata$Certainty_sci_know_6)/6),
-    development = ((exptwofinaldata$Development_sci_know_1 + exptwofinaldata$Development_sci_know_2 + exptwofinaldata$Development_sci_know_3 + exptwofinaldata$Development_sci_know_4 + exptwofinaldata$Development_sci_know_5 + exptwofinaldata$Development_sci_know_6)/6)
+    certainty = ((Certainty_sci_know_1 + Certainty_sci_know_2 + Certainty_sci_know_3 + Certainty_sci_know_4 + Certainty_sci_know_5 + Certainty_sci_know_6)/6),
+    development = ((Development_sci_know_1 + Development_sci_know_2 + Development_sci_know_3 + Development_sci_know_4 + Development_sci_know_5 + Development_sci_know_6)/6)
     )
 
 exptwofinaldata %>% 
