@@ -291,7 +291,8 @@ figure.1.fun <- function(y_var, plot_title, y_title, lim_1, lim_2)  {
   ggplot(exponefinaldata,aes(x = conflict, y = y_var, fill = conflict)) +
   geom_violin() +
   ggtitle(label = plot_title) +
-  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(plot.title = element_text(hjust = 0.5, size = 8),
+        axis.title.y = element_text(size = 6)) +
   scale_x_discrete(name = NULL) +
   scale_y_continuous(name = y_title, limits = c(lim_1, lim_2)) +
   facet_wrap(vars(format), strip.position = "bottom") +
